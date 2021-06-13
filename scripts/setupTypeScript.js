@@ -1,5 +1,5 @@
 // @ts-check
-
+//testing
 /** This script modifies the project to support TS code in .svelte files like:
 
   <script lang="ts">
