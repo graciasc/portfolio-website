@@ -3,28 +3,140 @@
 </script>
 
 <main>
-	<h1>Hello {name}!</h1>
-	<p>Visit the <a href="https://svelte.dev/tutorial">Svelte tutorial</a> to learn how to build Svelte apps.</p>
+	<div class="bg-hue h-full font-mono">
+		<!-- NAVBAR -->
+		<div class="lg:px-6 py-2 px-4 border-b-2 border-gray-600">
+		  <i class="fa fa-fire fa-lg"></i>
+		  <div class="inline lg:hidden float-right mt-1 ml-2 r">
+			<label for="menu-toggle"><i class="fa fa-bars fa-lg cursor-pointer" id="bars"> </i></label>
+		  </div>
+		  <input type="checkbox" id="menu-toggle" class="float-right mt-4 hidden" />
+		  <div class="pt-3 hidden" id="menu">
+			<nav class="cursor-pointer" id="nav">
+			  <ul>
+				<li class="">About</li>
+				<li class="">Resume</li>
+			  </ul>
+			</nav>
+		  </div>
+		  <div class="lg:inline lg:float-right hidden">
+			<button class="px-2 border-transparent border-b-2 hover:border-teal-600 focus:outline-none outline-none">About</button>
+			<button class="px-2 border-transparent border-b-2 hover:border-teal-600 focus:outline-none outline-none">Resume</button>
+		  </div>
+		</div>
+	  
+		<!-- Section -->
+		<div class="flex justify-center pt-24">
+		  <div class=" m-6 lg:m-12 text-center lg:w-1/2">
+			<p class="text-p-hue">Hi I am <span class="text-red-600"> Gracias Claude </span></p>
+			<h1 class="text-h-hue lg:text-3xl text-4xl font-extrabold">I'll Help You Build Your Dream</h1>
+			<p class="text-p-hue">Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s</p>
+			<button class="mt-4 border-b-2 font-bold border-teal-600 focus:outline-none hover:shadow-sm">Connect with me</button> <i class="fa fa-long-arrow-right animate-pulse text-gray-600"> </i>
+		  </div>
+		  <!-- <div class="w-1/2 relative"><img src="https://images.unsplash.com/photo-1564865878688-9a244444042a?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=1350&q=80"</div> -->
+		</div>
+	  
+		<!--  Arrow Icon -->
+		<div class="flex justify-center mt-12 lg:mt-20">
+		  <i class="fa fa-angle-double-down animate-bounce fa-2x text-gray-600"> </i>
+		</div>
+	  
+		<div class="border-b-2 border-gray-700 pt-6 lg:p-24"></div>
+	  
+		<!-- DESKTOP Section -->
+		<h1 id="demo"></h1>
+		<div class="lg:flex justify-center m-5 lg:m-24 bg-main relative hidden" id="section">
+		  <div class="w-1/2 p-6">
+			<h1 class="text-h-hue text-4xl font-bold leading-9 pt-4">The projects I've Worked on...</h1>
+			<p class="text-p-hue text-lg pt-6">Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s</p>
+			<button></button>
+		  </div>
+		  <div class="w-1/2 relative p-24">
+			<img class="absolute inset-0 w-full h-full object-cover object-center" src="https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fi.ytimg.com%2Fvi%2FnAH-eq7zgKk%2Fmaxresdefault.jpg&f=1&nofb=1" />
+		  </div>
+		</div>
+	  
+		<div class="lg:flex lg:justify-center m-5 lg:m-24 bg-main hidden relative" id="section2">
+		  <div class="w-1/2 p-6">
+			<h1 class="text-h-hue text-4xl font-bold leading-9 pt-4">The projects I've Worked on...</h1>
+			<p class="text-p-hue text-xl pt-6">Ipsum is simply dummy text of the printing and typesettings industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s</p>
+			<button></button>
+		  </div>
+		  <div class="w-1/2 relative p-24">
+			<img class="absolute inset-0 w-full h-full object-cover object-center" src="https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fi.ytimg.com%2Fvi%2FnAH-eq7zgKk%2Fmaxresdefault.jpg&f=1&nofb=1" />
+		  </div>
+		</div>
+	  
+		<div class="lg:flex lg:justify-center hidden m-5 lg:m-24 bg-main relative" id="section3">
+		  <div class="w-1/2 p-6">
+			<h1 class="text-h-hue text-4xl font-bold leading-9 pt-4">The projects I've Worked on...</h1>
+			<p class="text-p-hue text-xl pt-6">Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s</p>
+			<button></button>
+		  </div>
+		  <div class="w-1/2 relative p-24">
+			<img class="absolute inset-0 w-full h-full object-cover object-center" src="https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fi.ytimg.com%2Fvi%2FnAH-eq7zgKk%2Fmaxresdefault.jpg&f=1&nofb=1" />
+		  </div>
+		</div>
+	  
+		<!-- Mobile Sections -->
+		<div class="bg-main relative lg:hidden">
+		  <div class="pl-6">
+			<h1 class="text-h-hue text-2xl font-bold leading-9 pt-4">The projects I've Worked on...</h1>
+			<p class="text-p-hue pt-2">Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s</p>
+			<button></button>
+		  </div>
+		  <div class="relative h-48 m-5">
+			<img class="absolute inset-0 w-full h-full object-cover object-center" src="https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fi.ytimg.com%2Fvi%2FnAH-eq7zgKk%2Fmaxresdefault.jpg&f=1&nofb=1" />
+		  </div>
+		</div>
+	  
+		<div class="bg-main relative lg:hidden">
+		  <div class="pl-6">
+			<h1 class="text-h-hue text-2xl font-bold leading-9 pt-4">The projects I've Worked on...</h1>
+			<p class="text-p-hue pt-2">Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s</p>
+			<button></button>
+		  </div>
+		  <div class="relative h-48 m-5">
+			<img class="absolute inset-0 w-full h-full object-cover object-center" src="https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fi.ytimg.com%2Fvi%2FnAH-eq7zgKk%2Fmaxresdefault.jpg&f=1&nofb=1" />
+		  </div>
+		</div>
+	  
+		<div class="bg-main relative lg:hidden">
+		  <div class="pl-6">
+			<h1 class="text-h-hue text-2xl font-bold leading-9 pt-4">The projects I've Worked on...</h1>
+			<p class="text-p-hue pt-2">Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s</p>
+			<button></button>
+		  </div>
+		  <div class="relative h-48 m-5">
+			<img class="absolute inset-0 w-full h-full object-cover object-center" src="https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fi.ytimg.com%2Fvi%2FnAH-eq7zgKk%2Fmaxresdefault.jpg&f=1&nofb=1" />
+		  </div>
+		</div>
+	  
+		<!-- Footer  -->
+	  
+		<div class="sticky flex justify-between bg-secondary-hue w-full text-center border-t border-grey p-4 pin-b">
+		  <div>
+			<h1 class="font-bold">Contact</h1>
+			<p>Ipsum</p>
+			<p>Ipsum</p>
+		  </div>
+		  <div>
+			<h1 class="font-bold">About</h1>
+			<p>Ipsum</p>
+			<p>Ipsum</p>
+		  </div>
+		  <div>
+			<h1 class="font-bold">Check us out</h1>
+			<p>Ipsum</p>
+			<p>Ipsum</p>
+		  </div>
+		</div>
+	  </div>
 </main>
 
-<style>
-	main {
-		text-align: center;
-		padding: 1em;
-		max-width: 240px;
-		margin: 0 auto;
-	}
 
-	h1 {
-		color: #ff3e00;
-		text-transform: uppercase;
-		font-size: 4em;
-		font-weight: 100;
-	}
-
-	@media (min-width: 640px) {
-		main {
-			max-width: none;
-		}
-	}
-</style>
+<style global lang="postcss">
+	@tailwind base;
+	@tailwind components;
+	@tailwind utilities;
+  </style>
