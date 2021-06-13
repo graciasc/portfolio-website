@@ -19,7 +19,8 @@
   },
   "dependencies": {
     "autoprefixer": "^9",
-    "postcss": "^7",
+    "glob-parent": "^5.1.2",
+    "postcss": "^8.2.10",
     "sirv-cli": "^1.0.0",
     "tailwindcss": "npm:@tailwindcss/postcss7-compat"
   }
