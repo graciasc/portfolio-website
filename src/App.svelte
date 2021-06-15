@@ -1,6 +1,11 @@
 <script>
 	
 	import Nav from './components/Nav.svelte'
+	import 'animejs/lib/anime.es.js';
+	import Icon from 'svelte-awesome/components/Icon.svelte'
+	import { longArrowRight } from 'svelte-awesome/icons';
+
+	
 
 	export let name;
 </script>
@@ -16,17 +21,17 @@
 			<p class="text-p-hue">Hi I am <span class="text-red-600"> Gracias Claude </span></p>
 			<h1 class="text-h-hue lg:text-3xl text-4xl font-extrabold">I'll Help You Build Your Dream</h1>
 			<p class="text-p-hue">Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s</p>
-			<button class="">Connect with me</button> <i class="fa fa-long-arrow-right animate-pulse text-gray-600"> </i>
+			<p class="mt-4 border-b-2 font-bold border-teal-600 focus:outline-none inline-block lg:mt-4 hover:shadow-sm">Connect with me <Icon data={longArrowRight} class="text-gray-400 bg-white" scale="1"> </Icon> </p> 
 		  </div>
 		  <!-- <div class="w-1/2 relative"><img src="https://images.unsplash.com/photo-1564865878688-9a244444042a?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=1350&q=80"</div> -->
 		</div>
 	  
 		<!--  Arrow Icon -->
-		<div class="flex justify-center mt-12 lg:mt-20">
+		<div class="flex justify-center mt-12 lg:mt-10">
 		  <i class="fa fa-angle-double-down animate-bounce fa-2x text-gray-600"> </i>
 		</div>
 	  
-		<div class="border-b-2 border-gray-700 pt-6 lg:p-24"></div>
+		<div class="border-b-2 border-gray-700 pt-6 lg:p-12"></div>
 	  
 		<!-- DESKTOP Section -->
 		<h1 id="demo"></h1>

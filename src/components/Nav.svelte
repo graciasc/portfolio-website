@@ -26,8 +26,8 @@
     <input type="checkbox" id="menu-toggle" class="mt-4 hidden" />
 
     <div class="lg:inline lg:float-right hidden">
-      <button class="px-2 border-transparent border-b-2 hover:border-teal-600 focus:outline-none outline-none">About</button>
-      <button class="px-2 border-transparent border-b-2 hover:border-teal-600 focus:outline-none outline-none">Resume</button>
+      <p class="px-2 border-transparent border-b-2 hover:border-teal-600 focus:outline-none outline-none">About</p>
+      <p class="px-2 border-transparent border-b-2 hover:border-teal-600 focus:outline-none outline-none">Resume</p>
     </div>
   </div>
 </div>
