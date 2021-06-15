@@ -1,29 +1,14 @@
 <script>
+	
+	import Nav from './components/Nav.svelte'
+
 	export let name;
 </script>
 
 <main>
-	<div class="bg-hue h-full font-mono">
-		<!-- NAVBAR -->
-		<div class="lg:px-6 py-2 px-4 border-b-2 border-gray-600">
-		  <i class="fa fa-fire fa-lg"></i>
-		  <div class="inline lg:hidden float-right mt-1 ml-2 r">
-			<label for="menu-toggle"><i class="fa fa-bars fa-lg cursor-pointer" id="bars"> </i></label>
-		  </div>
-		  <input type="checkbox" id="menu-toggle" class="float-right mt-4 hidden" />
-		  <div class="pt-3 hidden" id="menu">
-			<nav class="cursor-pointer" id="nav">
-			  <ul>
-				<li class="">About</li>
-				<li class="">Resume</li>
-			  </ul>
-			</nav>
-		  </div>
-		  <div class="lg:inline lg:float-right hidden">
-			<button class="px-2 border-transparent border-b-2 hover:border-teal-600 focus:outline-none outline-none">About</button>
-			<button class="px-2 border-transparent border-b-2 hover:border-teal-600 focus:outline-none outline-none">Resume</button>
-		  </div>
-		</div>
+	<div class="h-full font-mono">
+		<!-- Nav bar -->
+		<Nav/>
 	  
 		<!-- Section -->
 		<div class="flex justify-center pt-24">
@@ -31,7 +16,7 @@
 			<p class="text-p-hue">Hi I am <span class="text-red-600"> Gracias Claude </span></p>
 			<h1 class="text-h-hue lg:text-3xl text-4xl font-extrabold">I'll Help You Build Your Dream</h1>
 			<p class="text-p-hue">Lorem Ipsum is simply dummy text of the printing and typesetting industry. Lorem Ipsum has been the industry's standard dummy text ever since the 1500s</p>
-			<button class="mt-4 border-b-2 font-bold border-teal-600 focus:outline-none hover:shadow-sm">Connect with me</button> <i class="fa fa-long-arrow-right animate-pulse text-gray-600"> </i>
+			<button class="">Connect with me</button> <i class="fa fa-long-arrow-right animate-pulse text-gray-600"> </i>
 		  </div>
 		  <!-- <div class="w-1/2 relative"><img src="https://images.unsplash.com/photo-1564865878688-9a244444042a?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=crop&w=1350&q=80"</div> -->
 		</div>
@@ -133,7 +118,6 @@
 		</div>
 	  </div>
 </main>
-
 
 <style global lang="postcss">
 	@tailwind base;
