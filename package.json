@@ -26,6 +26,7 @@
     "sirv-cli": "^1.0.0",
     "svelte-awesome": "^2.3.2",
     "svelte-preprocess": "^4.7.3",
+    "svelte-router-spa": "^6.0.2",
     "tailwindcss": "npm:@tailwindcss/postcss7-compat"
   }
 }
