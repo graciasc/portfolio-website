@@ -18,10 +18,15 @@
     "svelte": "^3.0.0"
   },
   "dependencies": {
+    "@fortawesome/free-solid-svg-icons": "^5.15.3",
+    "animejs": "^3.2.1",
     "autoprefixer": "^9",
     "glob-parent": "^5.1.2",
     "postcss": "^8.2.10",
     "sirv-cli": "^1.0.0",
+    "svelte-awesome": "^2.3.2",
+    "svelte-preprocess": "^4.7.3",
+    "svelte-router-spa": "^6.0.2",
     "tailwindcss": "npm:@tailwindcss/postcss7-compat"
   }
 }
