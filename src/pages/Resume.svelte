@@ -1,4 +1,3 @@
 <main>
-
-    <h1> Resume page </h1>
+  <h1>Resume page</h1>
 </main>
