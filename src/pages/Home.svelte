@@ -1,6 +1,7 @@
 <script>
   import Hero from "../components/Section.svelte";
   import MobileSection from "../screens/mobile/ProjectSection.svelte";
+	import { fade } from 'svelte/transition';
 
   const projects = [
     {
@@ -14,23 +15,34 @@
       img: "https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fi.ytimg.com%2Fvi%2FnAH-eq7zgKk%2Fmaxresdefault.jpg&f=1&nofb=1",
     },
   ];
+  // do animation based on y
+   let y;
+   let visible = false
+   console.log(visible)
+   $: if (y > 2) {
+     //add button to unfade below
+    visible = true
+  }
 </script>
+<!-- <svelte:window on:scrollY={handleKeydown}/>  -->
+<svelte:window bind:scrollY={y}/>
 
 <main>
   <Hero />
-
+<h1> Binding Y {y} </h1> 
   <!-- Spacing -->
   <div class="border-b-2 border-gray-700 pt-6 lg:p-12" />
-
   <!-- DESKTOP Section -->
-  {#each projects as project}
+  {#if visible}
+  {#each projects as project, i}
     <div
+      transition:fade="{{ duration: 2000 }}"
       class="lg:flex justify-center m-5 lg:m-24 bg-main relative hidden"
-      id="section"
+      id={`section${i}`}
     >
       <div class="w-1/2 p-6">
         <h1 class="text-h-hue text-4xl font-bold leading-9 pt-4">
-          {project.title}
+          {project.title}{i}
         </h1>
         <p class="text-p-hue text-lg pt-6">{project.text}</p>
         <button />
@@ -42,7 +54,8 @@
         />
       </div>
     </div>
-  {/each}
+    {/each}
+    {/if}
 
   <!-- Mobile Sections -->
   <MobileSection {projects} />
