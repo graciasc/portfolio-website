@@ -12,7 +12,7 @@
 </script>
 
 <main>
-  <div class="h-full">
+  <div class="">
     <!-- Nav bar -->
     <Nav />
     <!-- Router page -->

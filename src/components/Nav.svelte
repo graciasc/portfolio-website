@@ -19,8 +19,8 @@
       <div class="pt-3 hidden" id="menu">
         <nav class="cursor-pointer">
           <ul>
-            <li class="border-transparent border-b-2 hover:border-gray-600">About</li>
-            <li class="border-transparent border-b-2 hover:border-gray-600">Resume</li>
+            <li class="border-transparent border-b-2 hover:border-gray-600"><a class="a-no-style"  href="/about"> About </a> </li>
+            <li class="border-transparent border-b-2 hover:border-gray-600"><a class="a-no-style"  href="/about"> Resume </a></li>
             <li class="border-transparent border-b-2 hover:border-gray-600"><Icon data={githubAlt} class="text-black-400 hover:text-black-700 bg-white" scale="2"> </Icon></li>
             <li class="border-transparent border-b-2 hover:border-gray-600"><Icon data={githubAlt} class="text-black-400 hover:text-black-700 bg-white" scale="2"> </Icon></li>
           </ul>

@@ -1,10 +1,19 @@
 <script>
   import Icon from "svelte-awesome/components/Icon.svelte";
   import { longArrowRight } from "svelte-awesome/icons";
+
+  let scrollY;
+
+  function autoScroll() {
+    //scroll to Y after click
+    scrollY = 605
+  }
 </script>
 
+<svelte:window bind:scrollY={scrollY}/>
+
 <main>
-  <!-- Section -->
+  <!-- Section -->  
   <div class="flex justify-center pt-24 font-mono cursor-pointer">
     <div class=" m-6 lg:m-12 text-center lg:w-1/2">
       <p class="text-p-hue">
@@ -20,6 +29,7 @@
       </p>
       <p
         class="mt-4 border-b-2 font-bold border-teal-600 focus:outline-none inline-block lg:mt-4 hover:shadow-sm"
+        
       >
         Connect with me <Icon
           data={longArrowRight}
@@ -32,7 +42,7 @@
   </div>
 
   <!--  Arrow Icon -->
-  <div class="flex justify-center mt-12 lg:mt-10">
+          <div class="flex justify-center mt-12 lg:mt-10 cursor-pointer" on:click={autoScroll}>
     <i class="fa fa-angle-double-down animate-bounce fa-2x text-gray-600" />
   </div>
 
