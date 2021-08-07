@@ -24,8 +24,7 @@
             Hello World!
           </h1>
           <p class="pt-4 lg:text-2xl">
-            Fuelled by a passion for designing compelling products, I have a
-            deep desire to excel and continuously improve in my work. Learn more
+             I have a desire to excel and continuously improve in my work. Learn more
             about my journey below.
           </p>
         </div>
@@ -38,17 +37,11 @@
       <div class="pt-4 lg:w-1/2  mb-12">
         <div class="grid lg:justify-end">
           <h1 class="lg:text-6xl  text-5xl font-bold lg:text-left text-center">
-            My Carrer So Far!
+            My Career <br> So Far!
           </h1>
           <p class="pt-4 text-lg">
-            Always up for a challenge, I have worked for lean start-ups and was
-            a member of the first New Zealand start-up to attend Y Combinator,
-            the largest start-up accelerator in the world. From there, I worked
-            my way up to Art Director and Team Lead at Appster where I oversaw
-            the design of 30+ mobile and desktop apps. Currently, I lead UI/UX
-            design at SaaS start-up VideoMyJob.
-          </p>
-          <!-- <img class="object-cover shadow-md rounded-md h-2/5 w-2/5" src="https://personal-foto.s3.us-west-1.amazonaws.com/gracias.jpeg" /> -->
+            Always up for a challenge, I have worked for start-ups at the same time doing University.
+             Currently, I work as a Software Engineer for a widely innovative a fin-tech company.          </p>
         </div>
       </div>
 
@@ -57,7 +50,7 @@
           class="lg:flex lg:justify-center lg:items-center lg:m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400 "
         >
           <div class="text-xs font-normal leading-none max-w-full flex-initial">
-            UI DESIGN
+            REACT
           </div>
         </div>
         <div
@@ -105,7 +98,7 @@
                   <div class="flex relative w-4 h-4 bg-orange-500 justify-center items-center m-1 mr-2 ml-0 my-0 text-xs rounded-full"><img class="rounded-full" alt="A" src="https://randomuser.me/api/portraits/women/68.jpg"> </div>
               </div> -->
           <div class="text-xs font-normal leading-none max-w-full flex-initial">
-            KOTLIN
+            NODEJS
           </div>
         </div>
         <div

@@ -30,7 +30,7 @@
 <main>
   <Hero scrollY={y}/>
   <!-- Spacing -->
-  <div class="border-b-2 border-gray-700 pt-6 lg:p-12" />
+  <div class="border-b-2 border-gray-700 pt-6 lg:p-12 " />
   <!-- DESKTOP Section -->
   {#if visible}
   {#each projects as project, i}
