@@ -23,7 +23,7 @@
     "animejs": "^3.2.1",
     "autoprefixer": "^9",
     "glob-parent": "^5.1.2",
-    "postcss": "^8.2.10",
+    "postcss": "7.0.35",
     "sirv-cli": "^1.0.0",
     "svelte-awesome": "^2.3.2",
     "svelte-preprocess": "^4.7.3",
