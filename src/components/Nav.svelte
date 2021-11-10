@@ -167,7 +167,7 @@
             class={`table border-transparent border-b-2 hover:border-red-400 ${activeResume}`}
           >
             <a
-              on:click={() => close("resume")}
+              on:click={() => close()}
               target="_blank"
               class="a-no-style"
               href="https://personal-foto.s3.us-west-1.amazonaws.com/resume.pdf"
