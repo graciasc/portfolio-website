@@ -1,6 +1,5 @@
 <script>
   import Nav from "./components/Nav.svelte";
-  import Section from "./components/Section.svelte";
   import Footer from "./components/Footer.svelte";
   import { Router } from "svelte-router-spa";
   import { routes } from "./Router";
