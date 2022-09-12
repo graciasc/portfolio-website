@@ -1,5 +1,5 @@
 
-(function(l, r) { if (l.getElementById('livereloadscript')) return; r = l.createElement('script'); r.async = 1; r.src = '//' + (window.location.host || 'localhost').split(':')[0] + ':35729/livereload.js?snipver=1'; r.id = 'livereloadscript'; l.getElementsByTagName('head')[0].appendChild(r) })(window.document);
+(function(l, r) { if (!l || l.getElementById('livereloadscript')) return; r = l.createElement('script'); r.async = 1; r.src = '//' + (self.location.host || 'localhost').split(':')[0] + ':35729/livereload.js?snipver=1'; r.id = 'livereloadscript'; l.getElementsByTagName('head')[0].appendChild(r) })(self.document);
 var app = (function () {
     'use strict';
 
@@ -30,6 +30,14 @@ var app = (function () {
     }
     function safe_not_equal(a, b) {
         return a != a ? b == b : a !== b || ((a && typeof a === 'object') || typeof a === 'function');
+    }
+    let src_url_equal_anchor;
+    function src_url_equal(element_src, url) {
+        if (!src_url_equal_anchor) {
+            src_url_equal_anchor = document.createElement('a');
+        }
+        src_url_equal_anchor.href = url;
+        return element_src === src_url_equal_anchor.href;
     }
     function is_empty(obj) {
         return Object.keys(obj).length === 0;
@@ -78,12 +86,22 @@ var app = (function () {
         }
         return $$scope.dirty;
     }
-    function update_slot(slot, slot_definition, ctx, $$scope, dirty, get_slot_changes_fn, get_slot_context_fn) {
-        const slot_changes = get_slot_changes(slot_definition, $$scope, dirty, get_slot_changes_fn);
+    function update_slot_base(slot, slot_definition, ctx, $$scope, slot_changes, get_slot_context_fn) {
         if (slot_changes) {
             const slot_context = get_slot_context(slot_definition, ctx, $$scope, get_slot_context_fn);
             slot.p(slot_context, slot_changes);
         }
+    }
+    function get_all_dirty_from_scope($$scope) {
+        if ($$scope.ctx.length > 32) {
+            const dirty = [];
+            const length = $$scope.ctx.length / 32;
+            for (let i = 0; i < length; i++) {
+                dirty[i] = -1;
+            }
+            return dirty;
+        }
+        return -1;
     }
     function null_to_empty(value) {
         return value == null ? '' : value;
@@ -123,9 +141,26 @@ var app = (function () {
             }
         };
     }
-
     function append(target, node) {
         target.appendChild(node);
+    }
+    function get_root_for_style(node) {
+        if (!node)
+            return document;
+        const root = node.getRootNode ? node.getRootNode() : node.ownerDocument;
+        if (root && root.host) {
+            return root;
+        }
+        return node.ownerDocument;
+    }
+    function append_empty_stylesheet(node) {
+        const style_element = element('style');
+        append_stylesheet(get_root_for_style(node), style_element);
+        return style_element.sheet;
+    }
+    function append_stylesheet(node, style) {
+        append(node.head || node, style);
+        return style.sheet;
     }
     function insert(target, node, anchor) {
         target.insertBefore(node, anchor || null);
@@ -175,13 +210,15 @@ var app = (function () {
     function toggle_class(element, name, toggle) {
         element.classList[toggle ? 'add' : 'remove'](name);
     }
-    function custom_event(type, detail) {
+    function custom_event(type, detail, { bubbles = false, cancelable = false } = {}) {
         const e = document.createEvent('CustomEvent');
-        e.initCustomEvent(type, false, false, detail);
+        e.initCustomEvent(type, bubbles, cancelable, detail);
         return e;
     }
 
-    const active_docs = new Set();
+    // we need to store the information for multiple documents because a Svelte application could also contain iframes
+    // https://github.com/sveltejs/svelte/issues/3624
+    const managed_styles = new Map();
     let active = 0;
     // https://github.com/darkskyapp/string-hash/blob/master/index.js
     function hash(str) {
@@ -190,6 +227,11 @@ var app = (function () {
         while (i--)
             hash = ((hash << 5) - hash) ^ str.charCodeAt(i);
         return hash >>> 0;
+    }
+    function create_style_information(doc, node) {
+        const info = { stylesheet: append_empty_stylesheet(node), rules: {} };
+        managed_styles.set(doc, info);
+        return info;
     }
     function create_rule(node, a, b, duration, delay, ease, fn, uid = 0) {
         const step = 16.666 / duration;
@@ -200,12 +242,10 @@ var app = (function () {
         }
         const rule = keyframes + `100% {${fn(b, 1 - b)}}\n}`;
         const name = `__svelte_${hash(rule)}_${uid}`;
-        const doc = node.ownerDocument;
-        active_docs.add(doc);
-        const stylesheet = doc.__svelte_stylesheet || (doc.__svelte_stylesheet = doc.head.appendChild(element('style')).sheet);
-        const current_rules = doc.__svelte_rules || (doc.__svelte_rules = {});
-        if (!current_rules[name]) {
-            current_rules[name] = true;
+        const doc = get_root_for_style(node);
+        const { stylesheet, rules } = managed_styles.get(doc) || create_style_information(doc, node);
+        if (!rules[name]) {
+            rules[name] = true;
             stylesheet.insertRule(`@keyframes ${name} ${rule}`, stylesheet.cssRules.length);
         }
         const animation = node.style.animation || '';
@@ -231,14 +271,13 @@ var app = (function () {
         raf(() => {
             if (active)
                 return;
-            active_docs.forEach(doc => {
-                const stylesheet = doc.__svelte_stylesheet;
-                let i = stylesheet.cssRules.length;
-                while (i--)
-                    stylesheet.deleteRule(i);
-                doc.__svelte_rules = {};
+            managed_styles.forEach(info => {
+                const { ownerNode } = info.stylesheet;
+                // there is no ownerNode if it runs on jsdom.
+                if (ownerNode)
+                    detach(ownerNode);
             });
-            active_docs.clear();
+            managed_styles.clear();
         });
     }
 
@@ -273,22 +312,40 @@ var app = (function () {
     function add_flush_callback(fn) {
         flush_callbacks.push(fn);
     }
-    let flushing = false;
+    // flush() calls callbacks in this order:
+    // 1. All beforeUpdate callbacks, in order: parents before children
+    // 2. All bind:this callbacks, in reverse order: children before parents.
+    // 3. All afterUpdate callbacks, in order: parents before children. EXCEPT
+    //    for afterUpdates called during the initial onMount, which are called in
+    //    reverse order: children before parents.
+    // Since callbacks might update component values, which could trigger another
+    // call to flush(), the following steps guard against this:
+    // 1. During beforeUpdate, any updated components will be added to the
+    //    dirty_components array and will cause a reentrant call to flush(). Because
+    //    the flush index is kept outside the function, the reentrant call will pick
+    //    up where the earlier call left off and go through all dirty components. The
+    //    current_component value is saved and restored so that the reentrant call will
+    //    not interfere with the "parent" flush() call.
+    // 2. bind:this callbacks cannot trigger new flush() calls.
+    // 3. During afterUpdate, any updated components will NOT have their afterUpdate
+    //    callback called a second time; the seen_callbacks set, outside the flush()
+    //    function, guarantees this behavior.
     const seen_callbacks = new Set();
+    let flushidx = 0; // Do *not* move this inside the flush() function
     function flush() {
-        if (flushing)
-            return;
-        flushing = true;
+        const saved_component = current_component;
         do {
             // first, call beforeUpdate functions
             // and update components
-            for (let i = 0; i < dirty_components.length; i += 1) {
-                const component = dirty_components[i];
+            while (flushidx < dirty_components.length) {
+                const component = dirty_components[flushidx];
+                flushidx++;
                 set_current_component(component);
                 update(component.$$);
             }
             set_current_component(null);
             dirty_components.length = 0;
+            flushidx = 0;
             while (binding_callbacks.length)
                 binding_callbacks.pop()();
             // then, once components are updated, call
@@ -308,8 +365,8 @@ var app = (function () {
             flush_callbacks.pop()();
         }
         update_scheduled = false;
-        flushing = false;
         seen_callbacks.clear();
+        set_current_component(saved_component);
     }
     function update($$) {
         if ($$.fragment !== null) {
@@ -371,6 +428,9 @@ var app = (function () {
             });
             block.o(local);
         }
+        else if (callback) {
+            callback();
+        }
     }
     const null_transition = { duration: 0 };
     function create_in_transition(node, fn, params) {
@@ -415,6 +475,7 @@ var app = (function () {
             start() {
                 if (started)
                     return;
+                started = true;
                 delete_rule(node);
                 if (is_function(config)) {
                     config = config();
@@ -525,7 +586,7 @@ var app = (function () {
         }
         component.$$.dirty[(i / 31) | 0] |= (1 << (i % 31));
     }
-    function init(component, options, instance, create_fragment, not_equal, props, dirty = [-1]) {
+    function init(component, options, instance, create_fragment, not_equal, props, append_styles, dirty = [-1]) {
         const parent_component = current_component;
         set_current_component(component);
         const $$ = component.$$ = {
@@ -542,12 +603,14 @@ var app = (function () {
             on_disconnect: [],
             before_update: [],
             after_update: [],
-            context: new Map(parent_component ? parent_component.$$.context : options.context || []),
+            context: new Map(options.context || (parent_component ? parent_component.$$.context : [])),
             // everything else
             callbacks: blank_object(),
             dirty,
-            skip_bound: false
+            skip_bound: false,
+            root: options.target || parent_component.$$.root
         };
+        append_styles && append_styles($$.root);
         let ready = false;
         $$.ctx = instance
             ? instance(component, options.props || {}, (i, ret, ...rest) => {
@@ -611,7 +674,7 @@ var app = (function () {
     }
 
     function dispatch_dev(type, detail) {
-        document.dispatchEvent(custom_event(type, Object.assign({ version: '3.38.2' }, detail)));
+        document.dispatchEvent(custom_event(type, Object.assign({ version: '3.50.1' }, detail), { bubbles: true }));
     }
     function append_dev(target, node) {
         dispatch_dev('SvelteDOMInsert', { target, node });
@@ -698,17 +761,17 @@ var app = (function () {
 
     var longArrowRight = { 'long-arrow-right': { width: 1792, height: 1792, paths: [{ d: 'M1728 893q0 14-10 24l-384 354q-16 14-35 6-19-9-19-29v-224h-1248q-14 0-23-9t-9-23v-192q0-14 9-23t23-9h1248v-224q0-21 19-29t35 5l384 350q10 10 10 23z' }] } };
 
-    /* node_modules/svelte-awesome/components/svg/Path.svelte generated by Svelte v3.38.2 */
+    /* node_modules/svelte-awesome/components/svg/Path.svelte generated by Svelte v3.50.1 */
 
     const file$c = "node_modules/svelte-awesome/components/svg/Path.svelte";
 
     function create_fragment$f(ctx) {
     	let path;
-    	let path_key_value;
+    	let path_id_value;
 
     	let path_levels = [
     		{
-    			key: path_key_value = "path-" + /*id*/ ctx[0]
+    			id: path_id_value = "path-" + /*id*/ ctx[0]
     		},
     		/*data*/ ctx[1]
     	];
@@ -733,7 +796,7 @@ var app = (function () {
     		},
     		p: function update(ctx, [dirty]) {
     			set_svg_attributes(path, path_data = get_spread_update(path_levels, [
-    				dirty & /*id*/ 1 && path_key_value !== (path_key_value = "path-" + /*id*/ ctx[0]) && { key: path_key_value },
+    				dirty & /*id*/ 1 && path_id_value !== (path_id_value = "path-" + /*id*/ ctx[0]) && { id: path_id_value },
     				dirty & /*data*/ 2 && /*data*/ ctx[1]
     			]));
     		},
@@ -757,25 +820,25 @@ var app = (function () {
 
     function instance$f($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
-    	validate_slots("Path", slots, []);
-    	let { id = "" } = $$props;
+    	validate_slots('Path', slots, []);
+    	let { id } = $$props;
     	let { data = {} } = $$props;
-    	const writable_props = ["id", "data"];
+    	const writable_props = ['id', 'data'];
 
     	Object.keys($$props).forEach(key => {
-    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<Path> was created with unknown prop '${key}'`);
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<Path> was created with unknown prop '${key}'`);
     	});
 
     	$$self.$$set = $$props => {
-    		if ("id" in $$props) $$invalidate(0, id = $$props.id);
-    		if ("data" in $$props) $$invalidate(1, data = $$props.data);
+    		if ('id' in $$props) $$invalidate(0, id = $$props.id);
+    		if ('data' in $$props) $$invalidate(1, data = $$props.data);
     	};
 
     	$$self.$capture_state = () => ({ id, data });
 
     	$$self.$inject_state = $$props => {
-    		if ("id" in $$props) $$invalidate(0, id = $$props.id);
-    		if ("data" in $$props) $$invalidate(1, data = $$props.data);
+    		if ('id' in $$props) $$invalidate(0, id = $$props.id);
+    		if ('data' in $$props) $$invalidate(1, data = $$props.data);
     	};
 
     	if ($$props && "$$inject" in $$props) {
@@ -796,6 +859,13 @@ var app = (function () {
     			options,
     			id: create_fragment$f.name
     		});
+
+    		const { ctx } = this.$$;
+    		const props = options.props || {};
+
+    		if (/*id*/ ctx[0] === undefined && !('id' in props)) {
+    			console.warn("<Path> was created without expected prop 'id'");
+    		}
     	}
 
     	get id() {
@@ -815,17 +885,17 @@ var app = (function () {
     	}
     }
 
-    /* node_modules/svelte-awesome/components/svg/Polygon.svelte generated by Svelte v3.38.2 */
+    /* node_modules/svelte-awesome/components/svg/Polygon.svelte generated by Svelte v3.50.1 */
 
     const file$b = "node_modules/svelte-awesome/components/svg/Polygon.svelte";
 
     function create_fragment$e(ctx) {
     	let polygon;
-    	let polygon_key_value;
+    	let polygon_id_value;
 
     	let polygon_levels = [
     		{
-    			key: polygon_key_value = "polygon-" + /*id*/ ctx[0]
+    			id: polygon_id_value = "polygon-" + /*id*/ ctx[0]
     		},
     		/*data*/ ctx[1]
     	];
@@ -850,7 +920,7 @@ var app = (function () {
     		},
     		p: function update(ctx, [dirty]) {
     			set_svg_attributes(polygon, polygon_data = get_spread_update(polygon_levels, [
-    				dirty & /*id*/ 1 && polygon_key_value !== (polygon_key_value = "polygon-" + /*id*/ ctx[0]) && { key: polygon_key_value },
+    				dirty & /*id*/ 1 && polygon_id_value !== (polygon_id_value = "polygon-" + /*id*/ ctx[0]) && { id: polygon_id_value },
     				dirty & /*data*/ 2 && /*data*/ ctx[1]
     			]));
     		},
@@ -874,25 +944,25 @@ var app = (function () {
 
     function instance$e($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
-    	validate_slots("Polygon", slots, []);
-    	let { id = "" } = $$props;
+    	validate_slots('Polygon', slots, []);
+    	let { id } = $$props;
     	let { data = {} } = $$props;
-    	const writable_props = ["id", "data"];
+    	const writable_props = ['id', 'data'];
 
     	Object.keys($$props).forEach(key => {
-    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<Polygon> was created with unknown prop '${key}'`);
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<Polygon> was created with unknown prop '${key}'`);
     	});
 
     	$$self.$$set = $$props => {
-    		if ("id" in $$props) $$invalidate(0, id = $$props.id);
-    		if ("data" in $$props) $$invalidate(1, data = $$props.data);
+    		if ('id' in $$props) $$invalidate(0, id = $$props.id);
+    		if ('data' in $$props) $$invalidate(1, data = $$props.data);
     	};
 
     	$$self.$capture_state = () => ({ id, data });
 
     	$$self.$inject_state = $$props => {
-    		if ("id" in $$props) $$invalidate(0, id = $$props.id);
-    		if ("data" in $$props) $$invalidate(1, data = $$props.data);
+    		if ('id' in $$props) $$invalidate(0, id = $$props.id);
+    		if ('data' in $$props) $$invalidate(1, data = $$props.data);
     	};
 
     	if ($$props && "$$inject" in $$props) {
@@ -913,6 +983,13 @@ var app = (function () {
     			options,
     			id: create_fragment$e.name
     		});
+
+    		const { ctx } = this.$$;
+    		const props = options.props || {};
+
+    		if (/*id*/ ctx[0] === undefined && !('id' in props)) {
+    			console.warn("<Polygon> was created without expected prop 'id'");
+    		}
     	}
 
     	get id() {
@@ -932,7 +1009,7 @@ var app = (function () {
     	}
     }
 
-    /* node_modules/svelte-awesome/components/svg/Raw.svelte generated by Svelte v3.38.2 */
+    /* node_modules/svelte-awesome/components/svg/Raw.svelte generated by Svelte v3.50.1 */
 
     const file$a = "node_modules/svelte-awesome/components/svg/Raw.svelte";
 
@@ -973,8 +1050,8 @@ var app = (function () {
 
     function instance$d($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
-    	validate_slots("Raw", slots, []);
-    	let cursor = 870711;
+    	validate_slots('Raw', slots, []);
+    	let cursor = 0xd4937;
 
     	function getId() {
     		cursor += 1;
@@ -1011,22 +1088,22 @@ var app = (function () {
     		return rawData;
     	}
 
-    	const writable_props = ["data"];
+    	const writable_props = ['data'];
 
     	Object.keys($$props).forEach(key => {
-    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<Raw> was created with unknown prop '${key}'`);
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<Raw> was created with unknown prop '${key}'`);
     	});
 
     	$$self.$$set = $$props => {
-    		if ("data" in $$props) $$invalidate(1, data = $$props.data);
+    		if ('data' in $$props) $$invalidate(1, data = $$props.data);
     	};
 
     	$$self.$capture_state = () => ({ cursor, getId, raw, data, getRaw });
 
     	$$self.$inject_state = $$props => {
-    		if ("cursor" in $$props) cursor = $$props.cursor;
-    		if ("raw" in $$props) $$invalidate(0, raw = $$props.raw);
-    		if ("data" in $$props) $$invalidate(1, data = $$props.data);
+    		if ('cursor' in $$props) cursor = $$props.cursor;
+    		if ('raw' in $$props) $$invalidate(0, raw = $$props.raw);
+    		if ('data' in $$props) $$invalidate(1, data = $$props.data);
     	};
 
     	if ($$props && "$$inject" in $$props) {
@@ -1057,7 +1134,7 @@ var app = (function () {
     		const { ctx } = this.$$;
     		const props = options.props || {};
 
-    		if (/*data*/ ctx[1] === undefined && !("data" in props)) {
+    		if (/*data*/ ctx[1] === undefined && !('data' in props)) {
     			console.warn("<Raw> was created without expected prop 'data'");
     		}
     	}
@@ -1071,7 +1148,7 @@ var app = (function () {
     	}
     }
 
-    /* node_modules/svelte-awesome/components/svg/Svg.svelte generated by Svelte v3.38.2 */
+    /* node_modules/svelte-awesome/components/svg/Svg.svelte generated by Svelte v3.50.1 */
 
     const file$9 = "node_modules/svelte-awesome/components/svg/Svg.svelte";
 
@@ -1094,14 +1171,14 @@ var app = (function () {
     			attr_dev(svg, "width", /*width*/ ctx[1]);
     			attr_dev(svg, "height", /*height*/ ctx[2]);
     			attr_dev(svg, "aria-label", /*label*/ ctx[11]);
-    			attr_dev(svg, "role", svg_role_value = /*label*/ ctx[11] ? "img" : "presentation");
+    			attr_dev(svg, "role", svg_role_value = /*label*/ ctx[11] ? 'img' : 'presentation');
     			attr_dev(svg, "viewBox", /*box*/ ctx[3]);
     			attr_dev(svg, "style", /*style*/ ctx[10]);
     			toggle_class(svg, "fa-spin", /*spin*/ ctx[4]);
     			toggle_class(svg, "fa-pulse", /*pulse*/ ctx[6]);
     			toggle_class(svg, "fa-inverse", /*inverse*/ ctx[5]);
-    			toggle_class(svg, "fa-flip-horizontal", /*flip*/ ctx[7] === "horizontal");
-    			toggle_class(svg, "fa-flip-vertical", /*flip*/ ctx[7] === "vertical");
+    			toggle_class(svg, "fa-flip-horizontal", /*flip*/ ctx[7] === 'horizontal');
+    			toggle_class(svg, "fa-flip-vertical", /*flip*/ ctx[7] === 'vertical');
     			add_location(svg, file$9, 0, 0, 0);
     		},
     		l: function claim(nodes) {
@@ -1119,7 +1196,16 @@ var app = (function () {
     		p: function update(ctx, [dirty]) {
     			if (default_slot) {
     				if (default_slot.p && (!current || dirty & /*$$scope*/ 4096)) {
-    					update_slot(default_slot, default_slot_template, ctx, /*$$scope*/ ctx[12], dirty, null, null);
+    					update_slot_base(
+    						default_slot,
+    						default_slot_template,
+    						ctx,
+    						/*$$scope*/ ctx[12],
+    						!current
+    						? get_all_dirty_from_scope(/*$$scope*/ ctx[12])
+    						: get_slot_changes(default_slot_template, /*$$scope*/ ctx[12], dirty, null),
+    						null
+    					);
     				}
     			}
 
@@ -1147,7 +1233,7 @@ var app = (function () {
     				attr_dev(svg, "aria-label", /*label*/ ctx[11]);
     			}
 
-    			if (!current || dirty & /*label*/ 2048 && svg_role_value !== (svg_role_value = /*label*/ ctx[11] ? "img" : "presentation")) {
+    			if (!current || dirty & /*label*/ 2048 && svg_role_value !== (svg_role_value = /*label*/ ctx[11] ? 'img' : 'presentation')) {
     				attr_dev(svg, "role", svg_role_value);
     			}
 
@@ -1159,24 +1245,24 @@ var app = (function () {
     				attr_dev(svg, "style", /*style*/ ctx[10]);
     			}
 
-    			if (dirty & /*className, spin*/ 17) {
+    			if (!current || dirty & /*className, spin*/ 17) {
     				toggle_class(svg, "fa-spin", /*spin*/ ctx[4]);
     			}
 
-    			if (dirty & /*className, pulse*/ 65) {
+    			if (!current || dirty & /*className, pulse*/ 65) {
     				toggle_class(svg, "fa-pulse", /*pulse*/ ctx[6]);
     			}
 
-    			if (dirty & /*className, inverse*/ 33) {
+    			if (!current || dirty & /*className, inverse*/ 33) {
     				toggle_class(svg, "fa-inverse", /*inverse*/ ctx[5]);
     			}
 
-    			if (dirty & /*className, flip*/ 129) {
-    				toggle_class(svg, "fa-flip-horizontal", /*flip*/ ctx[7] === "horizontal");
+    			if (!current || dirty & /*className, flip*/ 129) {
+    				toggle_class(svg, "fa-flip-horizontal", /*flip*/ ctx[7] === 'horizontal');
     			}
 
-    			if (dirty & /*className, flip*/ 129) {
-    				toggle_class(svg, "fa-flip-vertical", /*flip*/ ctx[7] === "vertical");
+    			if (!current || dirty & /*className, flip*/ 129) {
+    				toggle_class(svg, "fa-flip-vertical", /*flip*/ ctx[7] === 'vertical');
     			}
     		},
     		i: function intro(local) {
@@ -1207,7 +1293,7 @@ var app = (function () {
 
     function instance$c($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
-    	validate_slots("Svg", slots, ['default']);
+    	validate_slots('Svg', slots, ['default']);
     	let { class: className } = $$props;
     	let { width } = $$props;
     	let { height } = $$props;
@@ -1222,38 +1308,38 @@ var app = (function () {
     	let { label = undefined } = $$props;
 
     	const writable_props = [
-    		"class",
-    		"width",
-    		"height",
-    		"box",
-    		"spin",
-    		"inverse",
-    		"pulse",
-    		"flip",
-    		"x",
-    		"y",
-    		"style",
-    		"label"
+    		'class',
+    		'width',
+    		'height',
+    		'box',
+    		'spin',
+    		'inverse',
+    		'pulse',
+    		'flip',
+    		'x',
+    		'y',
+    		'style',
+    		'label'
     	];
 
     	Object.keys($$props).forEach(key => {
-    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<Svg> was created with unknown prop '${key}'`);
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<Svg> was created with unknown prop '${key}'`);
     	});
 
     	$$self.$$set = $$props => {
-    		if ("class" in $$props) $$invalidate(0, className = $$props.class);
-    		if ("width" in $$props) $$invalidate(1, width = $$props.width);
-    		if ("height" in $$props) $$invalidate(2, height = $$props.height);
-    		if ("box" in $$props) $$invalidate(3, box = $$props.box);
-    		if ("spin" in $$props) $$invalidate(4, spin = $$props.spin);
-    		if ("inverse" in $$props) $$invalidate(5, inverse = $$props.inverse);
-    		if ("pulse" in $$props) $$invalidate(6, pulse = $$props.pulse);
-    		if ("flip" in $$props) $$invalidate(7, flip = $$props.flip);
-    		if ("x" in $$props) $$invalidate(8, x = $$props.x);
-    		if ("y" in $$props) $$invalidate(9, y = $$props.y);
-    		if ("style" in $$props) $$invalidate(10, style = $$props.style);
-    		if ("label" in $$props) $$invalidate(11, label = $$props.label);
-    		if ("$$scope" in $$props) $$invalidate(12, $$scope = $$props.$$scope);
+    		if ('class' in $$props) $$invalidate(0, className = $$props.class);
+    		if ('width' in $$props) $$invalidate(1, width = $$props.width);
+    		if ('height' in $$props) $$invalidate(2, height = $$props.height);
+    		if ('box' in $$props) $$invalidate(3, box = $$props.box);
+    		if ('spin' in $$props) $$invalidate(4, spin = $$props.spin);
+    		if ('inverse' in $$props) $$invalidate(5, inverse = $$props.inverse);
+    		if ('pulse' in $$props) $$invalidate(6, pulse = $$props.pulse);
+    		if ('flip' in $$props) $$invalidate(7, flip = $$props.flip);
+    		if ('x' in $$props) $$invalidate(8, x = $$props.x);
+    		if ('y' in $$props) $$invalidate(9, y = $$props.y);
+    		if ('style' in $$props) $$invalidate(10, style = $$props.style);
+    		if ('label' in $$props) $$invalidate(11, label = $$props.label);
+    		if ('$$scope' in $$props) $$invalidate(12, $$scope = $$props.$$scope);
     	};
 
     	$$self.$capture_state = () => ({
@@ -1272,18 +1358,18 @@ var app = (function () {
     	});
 
     	$$self.$inject_state = $$props => {
-    		if ("className" in $$props) $$invalidate(0, className = $$props.className);
-    		if ("width" in $$props) $$invalidate(1, width = $$props.width);
-    		if ("height" in $$props) $$invalidate(2, height = $$props.height);
-    		if ("box" in $$props) $$invalidate(3, box = $$props.box);
-    		if ("spin" in $$props) $$invalidate(4, spin = $$props.spin);
-    		if ("inverse" in $$props) $$invalidate(5, inverse = $$props.inverse);
-    		if ("pulse" in $$props) $$invalidate(6, pulse = $$props.pulse);
-    		if ("flip" in $$props) $$invalidate(7, flip = $$props.flip);
-    		if ("x" in $$props) $$invalidate(8, x = $$props.x);
-    		if ("y" in $$props) $$invalidate(9, y = $$props.y);
-    		if ("style" in $$props) $$invalidate(10, style = $$props.style);
-    		if ("label" in $$props) $$invalidate(11, label = $$props.label);
+    		if ('className' in $$props) $$invalidate(0, className = $$props.className);
+    		if ('width' in $$props) $$invalidate(1, width = $$props.width);
+    		if ('height' in $$props) $$invalidate(2, height = $$props.height);
+    		if ('box' in $$props) $$invalidate(3, box = $$props.box);
+    		if ('spin' in $$props) $$invalidate(4, spin = $$props.spin);
+    		if ('inverse' in $$props) $$invalidate(5, inverse = $$props.inverse);
+    		if ('pulse' in $$props) $$invalidate(6, pulse = $$props.pulse);
+    		if ('flip' in $$props) $$invalidate(7, flip = $$props.flip);
+    		if ('x' in $$props) $$invalidate(8, x = $$props.x);
+    		if ('y' in $$props) $$invalidate(9, y = $$props.y);
+    		if ('style' in $$props) $$invalidate(10, style = $$props.style);
+    		if ('label' in $$props) $$invalidate(11, label = $$props.label);
     	};
 
     	if ($$props && "$$inject" in $$props) {
@@ -1337,19 +1423,19 @@ var app = (function () {
     		const { ctx } = this.$$;
     		const props = options.props || {};
 
-    		if (/*className*/ ctx[0] === undefined && !("class" in props)) {
+    		if (/*className*/ ctx[0] === undefined && !('class' in props)) {
     			console.warn("<Svg> was created without expected prop 'class'");
     		}
 
-    		if (/*width*/ ctx[1] === undefined && !("width" in props)) {
+    		if (/*width*/ ctx[1] === undefined && !('width' in props)) {
     			console.warn("<Svg> was created without expected prop 'width'");
     		}
 
-    		if (/*height*/ ctx[2] === undefined && !("height" in props)) {
+    		if (/*height*/ ctx[2] === undefined && !('height' in props)) {
     			console.warn("<Svg> was created without expected prop 'height'");
     		}
 
-    		if (/*box*/ ctx[3] === undefined && !("box" in props)) {
+    		if (/*box*/ ctx[3] === undefined && !('box' in props)) {
     			console.warn("<Svg> was created without expected prop 'box'");
     		}
     	}
@@ -1451,7 +1537,7 @@ var app = (function () {
     	}
     }
 
-    /* node_modules/svelte-awesome/components/Icon.svelte generated by Svelte v3.38.2 */
+    /* node_modules/svelte-awesome/components/Icon.svelte generated by Svelte v3.50.1 */
 
     const { Object: Object_1, console: console_1$1 } = globals;
 
@@ -1475,9 +1561,9 @@ var app = (function () {
     	let t1;
     	let if_block2_anchor;
     	let current;
-    	let if_block0 = /*self*/ ctx[0].paths && create_if_block_3(ctx);
-    	let if_block1 = /*self*/ ctx[0].polygons && create_if_block_2$2(ctx);
-    	let if_block2 = /*self*/ ctx[0].raw && create_if_block_1$2(ctx);
+    	let if_block0 = /*self*/ ctx[6].paths && create_if_block_3(ctx);
+    	let if_block1 = /*self*/ ctx[6].polygons && create_if_block_2$2(ctx);
+    	let if_block2 = /*self*/ ctx[6].raw && create_if_block_1$2(ctx);
 
     	const block = {
     		c: function create() {
@@ -1498,11 +1584,11 @@ var app = (function () {
     			current = true;
     		},
     		p: function update(ctx, dirty) {
-    			if (/*self*/ ctx[0].paths) {
+    			if (/*self*/ ctx[6].paths) {
     				if (if_block0) {
     					if_block0.p(ctx, dirty);
 
-    					if (dirty[0] & /*self*/ 1) {
+    					if (dirty[0] & /*self*/ 64) {
     						transition_in(if_block0, 1);
     					}
     				} else {
@@ -1521,11 +1607,11 @@ var app = (function () {
     				check_outros();
     			}
 
-    			if (/*self*/ ctx[0].polygons) {
+    			if (/*self*/ ctx[6].polygons) {
     				if (if_block1) {
     					if_block1.p(ctx, dirty);
 
-    					if (dirty[0] & /*self*/ 1) {
+    					if (dirty[0] & /*self*/ 64) {
     						transition_in(if_block1, 1);
     					}
     				} else {
@@ -1544,11 +1630,11 @@ var app = (function () {
     				check_outros();
     			}
 
-    			if (/*self*/ ctx[0].raw) {
+    			if (/*self*/ ctx[6].raw) {
     				if (if_block2) {
     					if_block2.p(ctx, dirty);
 
-    					if (dirty[0] & /*self*/ 1) {
+    					if (dirty[0] & /*self*/ 64) {
     						transition_in(if_block2, 1);
     					}
     				} else {
@@ -1605,7 +1691,7 @@ var app = (function () {
     function create_if_block_3(ctx) {
     	let each_1_anchor;
     	let current;
-    	let each_value_1 = /*self*/ ctx[0].paths;
+    	let each_value_1 = /*self*/ ctx[6].paths;
     	validate_each_argument(each_value_1);
     	let each_blocks = [];
 
@@ -1634,8 +1720,8 @@ var app = (function () {
     			current = true;
     		},
     		p: function update(ctx, dirty) {
-    			if (dirty[0] & /*self*/ 1) {
-    				each_value_1 = /*self*/ ctx[0].paths;
+    			if (dirty[0] & /*self*/ 64) {
+    				each_value_1 = /*self*/ ctx[6].paths;
     				validate_each_argument(each_value_1);
     				let i;
 
@@ -1720,7 +1806,7 @@ var app = (function () {
     		},
     		p: function update(ctx, dirty) {
     			const path_changes = {};
-    			if (dirty[0] & /*self*/ 1) path_changes.data = /*path*/ ctx[32];
+    			if (dirty[0] & /*self*/ 64) path_changes.data = /*path*/ ctx[32];
     			path.$set(path_changes);
     		},
     		i: function intro(local) {
@@ -1752,7 +1838,7 @@ var app = (function () {
     function create_if_block_2$2(ctx) {
     	let each_1_anchor;
     	let current;
-    	let each_value = /*self*/ ctx[0].polygons;
+    	let each_value = /*self*/ ctx[6].polygons;
     	validate_each_argument(each_value);
     	let each_blocks = [];
 
@@ -1781,8 +1867,8 @@ var app = (function () {
     			current = true;
     		},
     		p: function update(ctx, dirty) {
-    			if (dirty[0] & /*self*/ 1) {
-    				each_value = /*self*/ ctx[0].polygons;
+    			if (dirty[0] & /*self*/ 64) {
+    				each_value = /*self*/ ctx[6].polygons;
     				validate_each_argument(each_value);
     				let i;
 
@@ -1867,7 +1953,7 @@ var app = (function () {
     		},
     		p: function update(ctx, dirty) {
     			const polygon_changes = {};
-    			if (dirty[0] & /*self*/ 1) polygon_changes.data = /*polygon*/ ctx[29];
+    			if (dirty[0] & /*self*/ 64) polygon_changes.data = /*polygon*/ ctx[29];
     			polygon.$set(polygon_changes);
     		},
     		i: function intro(local) {
@@ -1907,12 +1993,12 @@ var app = (function () {
 
     	let raw_props = {};
 
-    	if (/*self*/ ctx[0] !== void 0) {
-    		raw_props.data = /*self*/ ctx[0];
+    	if (/*self*/ ctx[6] !== void 0) {
+    		raw_props.data = /*self*/ ctx[6];
     	}
 
     	raw = new Raw({ props: raw_props, $$inline: true });
-    	binding_callbacks.push(() => bind(raw, "data", raw_data_binding));
+    	binding_callbacks.push(() => bind(raw, 'data', raw_data_binding));
 
     	const block = {
     		c: function create() {
@@ -1925,9 +2011,9 @@ var app = (function () {
     		p: function update(ctx, dirty) {
     			const raw_changes = {};
 
-    			if (!updating_data && dirty[0] & /*self*/ 1) {
+    			if (!updating_data && dirty[0] & /*self*/ 64) {
     				updating_data = true;
-    				raw_changes.data = /*self*/ ctx[0];
+    				raw_changes.data = /*self*/ ctx[6];
     				add_flush_callback(() => updating_data = false);
     			}
 
@@ -1962,7 +2048,7 @@ var app = (function () {
     function fallback_block(ctx) {
     	let if_block_anchor;
     	let current;
-    	let if_block = /*self*/ ctx[0] && create_if_block$3(ctx);
+    	let if_block = /*self*/ ctx[6] && create_if_block$3(ctx);
 
     	const block = {
     		c: function create() {
@@ -1975,11 +2061,11 @@ var app = (function () {
     			current = true;
     		},
     		p: function update(ctx, dirty) {
-    			if (/*self*/ ctx[0]) {
+    			if (/*self*/ ctx[6]) {
     				if (if_block) {
     					if_block.p(ctx, dirty);
 
-    					if (dirty[0] & /*self*/ 1) {
+    					if (dirty[0] & /*self*/ 64) {
     						transition_in(if_block, 1);
     					}
     				} else {
@@ -2045,11 +2131,20 @@ var app = (function () {
     		p: function update(ctx, dirty) {
     			if (default_slot) {
     				if (default_slot.p && (!current || dirty[0] & /*$$scope*/ 65536)) {
-    					update_slot(default_slot, default_slot_template, ctx, /*$$scope*/ ctx[16], dirty, null, null);
+    					update_slot_base(
+    						default_slot,
+    						default_slot_template,
+    						ctx,
+    						/*$$scope*/ ctx[16],
+    						!current
+    						? get_all_dirty_from_scope(/*$$scope*/ ctx[16])
+    						: get_slot_changes(default_slot_template, /*$$scope*/ ctx[16], dirty, null),
+    						null
+    					);
     				}
     			} else {
-    				if (default_slot_or_fallback && default_slot_or_fallback.p && dirty[0] & /*self*/ 1) {
-    					default_slot_or_fallback.p(ctx, dirty);
+    				if (default_slot_or_fallback && default_slot_or_fallback.p && (!current || dirty[0] & /*self*/ 64)) {
+    					default_slot_or_fallback.p(ctx, !current ? [-1, -1] : dirty);
     				}
     			}
     		},
@@ -2084,16 +2179,16 @@ var app = (function () {
 
     	svg = new Svg({
     			props: {
-    				label: /*label*/ ctx[6],
+    				label: /*label*/ ctx[5],
     				width: /*width*/ ctx[7],
     				height: /*height*/ ctx[8],
     				box: /*box*/ ctx[10],
     				style: /*combinedStyle*/ ctx[9],
-    				spin: /*spin*/ ctx[2],
-    				flip: /*flip*/ ctx[5],
-    				inverse: /*inverse*/ ctx[3],
-    				pulse: /*pulse*/ ctx[4],
-    				class: /*className*/ ctx[1],
+    				spin: /*spin*/ ctx[1],
+    				flip: /*flip*/ ctx[4],
+    				inverse: /*inverse*/ ctx[2],
+    				pulse: /*pulse*/ ctx[3],
+    				class: /*className*/ ctx[0],
     				$$slots: { default: [create_default_slot] },
     				$$scope: { ctx }
     			},
@@ -2113,18 +2208,18 @@ var app = (function () {
     		},
     		p: function update(ctx, dirty) {
     			const svg_changes = {};
-    			if (dirty[0] & /*label*/ 64) svg_changes.label = /*label*/ ctx[6];
+    			if (dirty[0] & /*label*/ 32) svg_changes.label = /*label*/ ctx[5];
     			if (dirty[0] & /*width*/ 128) svg_changes.width = /*width*/ ctx[7];
     			if (dirty[0] & /*height*/ 256) svg_changes.height = /*height*/ ctx[8];
     			if (dirty[0] & /*box*/ 1024) svg_changes.box = /*box*/ ctx[10];
     			if (dirty[0] & /*combinedStyle*/ 512) svg_changes.style = /*combinedStyle*/ ctx[9];
-    			if (dirty[0] & /*spin*/ 4) svg_changes.spin = /*spin*/ ctx[2];
-    			if (dirty[0] & /*flip*/ 32) svg_changes.flip = /*flip*/ ctx[5];
-    			if (dirty[0] & /*inverse*/ 8) svg_changes.inverse = /*inverse*/ ctx[3];
-    			if (dirty[0] & /*pulse*/ 16) svg_changes.pulse = /*pulse*/ ctx[4];
-    			if (dirty[0] & /*className*/ 2) svg_changes.class = /*className*/ ctx[1];
+    			if (dirty[0] & /*spin*/ 2) svg_changes.spin = /*spin*/ ctx[1];
+    			if (dirty[0] & /*flip*/ 16) svg_changes.flip = /*flip*/ ctx[4];
+    			if (dirty[0] & /*inverse*/ 4) svg_changes.inverse = /*inverse*/ ctx[2];
+    			if (dirty[0] & /*pulse*/ 8) svg_changes.pulse = /*pulse*/ ctx[3];
+    			if (dirty[0] & /*className*/ 1) svg_changes.class = /*className*/ ctx[0];
 
-    			if (dirty[0] & /*$$scope, self*/ 65537) {
+    			if (dirty[0] & /*$$scope, self*/ 65600) {
     				svg_changes.$$scope = { dirty, ctx };
     			}
 
@@ -2156,7 +2251,7 @@ var app = (function () {
     }
 
     function normaliseData(data) {
-    	if ("iconName" in data && "icon" in data) {
+    	if ('iconName' in data && 'icon' in data) {
     		let normalisedData = {};
     		let faIcon = data.icon;
     		let name = data.iconName;
@@ -2173,7 +2268,7 @@ var app = (function () {
 
     function instance$b($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
-    	validate_slots("Icon", slots, ['default']);
+    	validate_slots('Icon', slots, ['default']);
     	let { class: className = "" } = $$props;
     	let { data } = $$props;
     	let { scale = 1 } = $$props;
@@ -2182,7 +2277,7 @@ var app = (function () {
     	let { pulse = false } = $$props;
     	let { flip = null } = $$props;
     	let { label = null } = $$props;
-    	let { self = null } = $$props;
+    	let self = null;
     	let { style = null } = $$props;
 
     	// internal
@@ -2198,7 +2293,7 @@ var app = (function () {
     	let box;
 
     	function init() {
-    		if (typeof data === "undefined") {
+    		if (typeof data === 'undefined') {
     			return;
     		}
 
@@ -2222,19 +2317,19 @@ var app = (function () {
     			icon.polygons.push({ points: icon.points });
     		}
 
-    		$$invalidate(0, self = icon);
+    		$$invalidate(6, self = icon);
     	}
 
     	function normalisedScale() {
     		let numScale = 1;
 
-    		if (typeof scale !== "undefined") {
+    		if (typeof scale !== 'undefined') {
     			numScale = Number(scale);
     		}
 
     		if (isNaN(numScale) || numScale <= 0) {
     			// eslint-disable-line no-restricted-globals
-    			console.warn("Invalid prop: prop \"scale\" should be a number over 0."); // eslint-disable-line no-console
+    			console.warn('Invalid prop: prop "scale" should be a number over 0.'); // eslint-disable-line no-console
 
     			return outerScale;
     		}
@@ -2299,47 +2394,35 @@ var app = (function () {
     			return combined;
     		}
 
-    		if (combined !== "" && !combined.endsWith(";")) {
-    			combined += "; ";
+    		if (combined !== "" && !combined.endsWith(';')) {
+    			combined += '; ';
     		}
 
     		return `${combined}font-size: ${size}em`;
     	}
 
-    	const writable_props = [
-    		"class",
-    		"data",
-    		"scale",
-    		"spin",
-    		"inverse",
-    		"pulse",
-    		"flip",
-    		"label",
-    		"self",
-    		"style"
-    	];
+    	const writable_props = ['class', 'data', 'scale', 'spin', 'inverse', 'pulse', 'flip', 'label', 'style'];
 
     	Object_1.keys($$props).forEach(key => {
-    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console_1$1.warn(`<Icon> was created with unknown prop '${key}'`);
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console_1$1.warn(`<Icon> was created with unknown prop '${key}'`);
     	});
 
     	function raw_data_binding(value) {
     		self = value;
-    		$$invalidate(0, self);
+    		$$invalidate(6, self);
     	}
 
     	$$self.$$set = $$props => {
-    		if ("class" in $$props) $$invalidate(1, className = $$props.class);
-    		if ("data" in $$props) $$invalidate(11, data = $$props.data);
-    		if ("scale" in $$props) $$invalidate(12, scale = $$props.scale);
-    		if ("spin" in $$props) $$invalidate(2, spin = $$props.spin);
-    		if ("inverse" in $$props) $$invalidate(3, inverse = $$props.inverse);
-    		if ("pulse" in $$props) $$invalidate(4, pulse = $$props.pulse);
-    		if ("flip" in $$props) $$invalidate(5, flip = $$props.flip);
-    		if ("label" in $$props) $$invalidate(6, label = $$props.label);
-    		if ("self" in $$props) $$invalidate(0, self = $$props.self);
-    		if ("style" in $$props) $$invalidate(13, style = $$props.style);
-    		if ("$$scope" in $$props) $$invalidate(16, $$scope = $$props.$$scope);
+    		if ('class' in $$props) $$invalidate(0, className = $$props.class);
+    		if ('data' in $$props) $$invalidate(11, data = $$props.data);
+    		if ('scale' in $$props) $$invalidate(12, scale = $$props.scale);
+    		if ('spin' in $$props) $$invalidate(1, spin = $$props.spin);
+    		if ('inverse' in $$props) $$invalidate(2, inverse = $$props.inverse);
+    		if ('pulse' in $$props) $$invalidate(3, pulse = $$props.pulse);
+    		if ('flip' in $$props) $$invalidate(4, flip = $$props.flip);
+    		if ('label' in $$props) $$invalidate(5, label = $$props.label);
+    		if ('style' in $$props) $$invalidate(13, style = $$props.style);
+    		if ('$$scope' in $$props) $$invalidate(16, $$scope = $$props.$$scope);
     	};
 
     	$$self.$capture_state = () => ({
@@ -2377,25 +2460,25 @@ var app = (function () {
     	});
 
     	$$self.$inject_state = $$props => {
-    		if ("className" in $$props) $$invalidate(1, className = $$props.className);
-    		if ("data" in $$props) $$invalidate(11, data = $$props.data);
-    		if ("scale" in $$props) $$invalidate(12, scale = $$props.scale);
-    		if ("spin" in $$props) $$invalidate(2, spin = $$props.spin);
-    		if ("inverse" in $$props) $$invalidate(3, inverse = $$props.inverse);
-    		if ("pulse" in $$props) $$invalidate(4, pulse = $$props.pulse);
-    		if ("flip" in $$props) $$invalidate(5, flip = $$props.flip);
-    		if ("label" in $$props) $$invalidate(6, label = $$props.label);
-    		if ("self" in $$props) $$invalidate(0, self = $$props.self);
-    		if ("style" in $$props) $$invalidate(13, style = $$props.style);
-    		if ("x" in $$props) x = $$props.x;
-    		if ("y" in $$props) y = $$props.y;
-    		if ("childrenHeight" in $$props) childrenHeight = $$props.childrenHeight;
-    		if ("childrenWidth" in $$props) childrenWidth = $$props.childrenWidth;
-    		if ("outerScale" in $$props) outerScale = $$props.outerScale;
-    		if ("width" in $$props) $$invalidate(7, width = $$props.width);
-    		if ("height" in $$props) $$invalidate(8, height = $$props.height);
-    		if ("combinedStyle" in $$props) $$invalidate(9, combinedStyle = $$props.combinedStyle);
-    		if ("box" in $$props) $$invalidate(10, box = $$props.box);
+    		if ('className' in $$props) $$invalidate(0, className = $$props.className);
+    		if ('data' in $$props) $$invalidate(11, data = $$props.data);
+    		if ('scale' in $$props) $$invalidate(12, scale = $$props.scale);
+    		if ('spin' in $$props) $$invalidate(1, spin = $$props.spin);
+    		if ('inverse' in $$props) $$invalidate(2, inverse = $$props.inverse);
+    		if ('pulse' in $$props) $$invalidate(3, pulse = $$props.pulse);
+    		if ('flip' in $$props) $$invalidate(4, flip = $$props.flip);
+    		if ('label' in $$props) $$invalidate(5, label = $$props.label);
+    		if ('self' in $$props) $$invalidate(6, self = $$props.self);
+    		if ('style' in $$props) $$invalidate(13, style = $$props.style);
+    		if ('x' in $$props) x = $$props.x;
+    		if ('y' in $$props) y = $$props.y;
+    		if ('childrenHeight' in $$props) childrenHeight = $$props.childrenHeight;
+    		if ('childrenWidth' in $$props) childrenWidth = $$props.childrenWidth;
+    		if ('outerScale' in $$props) outerScale = $$props.outerScale;
+    		if ('width' in $$props) $$invalidate(7, width = $$props.width);
+    		if ('height' in $$props) $$invalidate(8, height = $$props.height);
+    		if ('combinedStyle' in $$props) $$invalidate(9, combinedStyle = $$props.combinedStyle);
+    		if ('box' in $$props) $$invalidate(10, box = $$props.box);
     	};
 
     	if ($$props && "$$inject" in $$props) {
@@ -2415,13 +2498,13 @@ var app = (function () {
     	};
 
     	return [
-    		self,
     		className,
     		spin,
     		inverse,
     		pulse,
     		flip,
     		label,
+    		self,
     		width,
     		height,
     		combinedStyle,
@@ -2446,17 +2529,17 @@ var app = (function () {
     			create_fragment$b,
     			safe_not_equal,
     			{
-    				class: 1,
+    				class: 0,
     				data: 11,
     				scale: 12,
-    				spin: 2,
-    				inverse: 3,
-    				pulse: 4,
-    				flip: 5,
-    				label: 6,
-    				self: 0,
+    				spin: 1,
+    				inverse: 2,
+    				pulse: 3,
+    				flip: 4,
+    				label: 5,
     				style: 13
     			},
+    			null,
     			[-1, -1]
     		);
 
@@ -2470,7 +2553,7 @@ var app = (function () {
     		const { ctx } = this.$$;
     		const props = options.props || {};
 
-    		if (/*data*/ ctx[11] === undefined && !("data" in props)) {
+    		if (/*data*/ ctx[11] === undefined && !('data' in props)) {
     			console_1$1.warn("<Icon> was created without expected prop 'data'");
     		}
     	}
@@ -2539,14 +2622,6 @@ var app = (function () {
     		throw new Error("<Icon>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
     	}
 
-    	get self() {
-    		throw new Error("<Icon>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
-    	}
-
-    	set self(value) {
-    		throw new Error("<Icon>: Props cannot be set directly on the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
-    	}
-
     	get style() {
     		throw new Error("<Icon>: Props cannot be read directly from the component instance unless compiling with 'accessors: true' or '<svelte:options accessors/>'");
     	}
@@ -2556,7 +2631,7 @@ var app = (function () {
     	}
     }
 
-    /* src/components/Nav.svelte generated by Svelte v3.38.2 */
+    /* src/components/Nav.svelte generated by Svelte v3.50.1 */
     const file$8 = "src/components/Nav.svelte";
 
     // (96:10) {:else}
@@ -2662,14 +2737,14 @@ var app = (function () {
     			attr_dev(a0, "class", "a-no-style svelte-vlqexb");
     			attr_dev(a0, "href", "/about");
     			add_location(a0, file$8, 161, 12, 5069);
-    			attr_dev(li0, "class", li0_class_value = "" + (null_to_empty(`table border-transparent border-b-2 hover:border-red-400 ${/*activeAbout*/ ctx[2]}`) + " svelte-vlqexb"));
+    			attr_dev(li0, "class", li0_class_value = "" + (null_to_empty(`table border-transparent border-b-2 hover:border-red-400 ${/*activeAbout*/ ctx[0]}`) + " svelte-vlqexb"));
     			add_location(li0, file$8, 158, 10, 4947);
     			attr_dev(a1, "target", "_blank");
     			attr_dev(a1, "class", "a-no-style svelte-vlqexb");
     			attr_dev(a1, "href", "https://personal-foto.s3.us-west-1.amazonaws.com/resume.pdf");
     			attr_dev(a1, "download", "");
     			add_location(a1, file$8, 168, 12, 5324);
-    			attr_dev(li1, "class", li1_class_value = "" + (null_to_empty(`table border-transparent border-b-2 hover:border-red-400 ${/*activeResume*/ ctx[3]}`) + " svelte-vlqexb"));
+    			attr_dev(li1, "class", li1_class_value = "" + (null_to_empty(`table border-transparent border-b-2 hover:border-red-400 ${/*activeResume*/ ctx[1]}`) + " svelte-vlqexb"));
     			add_location(li1, file$8, 165, 10, 5201);
     			add_location(ul, file$8, 157, 8, 4932);
     			attr_dev(nav, "class", "cursor-pointer block");
@@ -2697,11 +2772,11 @@ var app = (function () {
     			}
     		},
     		p: function update(ctx, dirty) {
-    			if (dirty & /*activeAbout*/ 4 && li0_class_value !== (li0_class_value = "" + (null_to_empty(`table border-transparent border-b-2 hover:border-red-400 ${/*activeAbout*/ ctx[2]}`) + " svelte-vlqexb"))) {
+    			if (dirty & /*activeAbout*/ 1 && li0_class_value !== (li0_class_value = "" + (null_to_empty(`table border-transparent border-b-2 hover:border-red-400 ${/*activeAbout*/ ctx[0]}`) + " svelte-vlqexb"))) {
     				attr_dev(li0, "class", li0_class_value);
     			}
 
-    			if (dirty & /*activeResume*/ 8 && li1_class_value !== (li1_class_value = "" + (null_to_empty(`table border-transparent border-b-2 hover:border-red-400 ${/*activeResume*/ ctx[3]}`) + " svelte-vlqexb"))) {
+    			if (dirty & /*activeResume*/ 2 && li1_class_value !== (li1_class_value = "" + (null_to_empty(`table border-transparent border-b-2 hover:border-red-400 ${/*activeResume*/ ctx[1]}`) + " svelte-vlqexb"))) {
     				attr_dev(li1, "class", li1_class_value);
     			}
     		},
@@ -2795,8 +2870,8 @@ var app = (function () {
     		});
 
     	function select_block_type(ctx, dirty) {
-    		if (!/*toggle*/ ctx[0]) return create_if_block_1$1;
-    		if (/*toggle*/ ctx[0]) return create_if_block_2$1;
+    		if (!/*toggle*/ ctx[2]) return create_if_block_1$1;
+    		if (/*toggle*/ ctx[2]) return create_if_block_2$1;
     		return create_else_block;
     	}
 
@@ -2822,7 +2897,7 @@ var app = (function () {
     			$$inline: true
     		});
 
-    	let if_block1 = /*toggle*/ ctx[0] === true && create_if_block$2(ctx);
+    	let if_block1 = /*toggle*/ ctx[2] === true && create_if_block$2(ctx);
 
     	const block = {
     		c: function create() {
@@ -2887,7 +2962,7 @@ var app = (function () {
     			attr_dev(a0, "class", "a-no-style  svelte-vlqexb");
     			attr_dev(a0, "href", "/");
     			add_location(a0, file$8, 52, 10, 1354);
-    			attr_dev(h1, "class", "text-black  hover:text-red-500");
+    			attr_dev(h1, "class", "text-black hover:text-red-500");
     			add_location(h1, file$8, 51, 8, 1275);
     			attr_dev(a1, "class", "a-no-style svelte-vlqexb");
     			attr_dev(a1, "href", "/about");
@@ -2918,7 +2993,7 @@ var app = (function () {
     			attr_dev(a3, "class", "a-no-style svelte-vlqexb");
     			attr_dev(a3, "href", "/about");
     			add_location(a3, file$8, 104, 10, 3318);
-    			attr_dev(p0, "class", p0_class_value = "" + (null_to_empty(`px-2 inline  border-transparent border-b-2  hover:border-red-400 ${/*activeAbout*/ ctx[2]}`) + " svelte-vlqexb"));
+    			attr_dev(p0, "class", p0_class_value = "" + (null_to_empty(`px-2 inline  border-transparent border-b-2  hover:border-red-400 ${/*activeAbout*/ ctx[0]}`) + " svelte-vlqexb"));
     			add_location(p0, file$8, 101, 8, 3195);
     			attr_dev(a4, "target", "_blank");
     			attr_dev(a4, "class", "a-no-style svelte-vlqexb");
@@ -2931,17 +3006,17 @@ var app = (function () {
     			attr_dev(a5, "class", "a-no-style svelte-vlqexb");
     			attr_dev(a5, "href", "https://github.com/graciasc");
     			add_location(a5, file$8, 123, 10, 3931);
-    			attr_dev(p2, "class", " px-1 border-transparent inline  border-b-2 bottom-1 relative hover:border-teal-600 focus:outline-none outline-none");
+    			attr_dev(p2, "class", "px-1 border-transparent inline border-b-2 bottom-1 relative hover:border-teal-600 focus:outline-none outline-none");
     			add_location(p2, file$8, 120, 8, 3774);
     			attr_dev(a6, "target", "_blank");
     			attr_dev(a6, "class", "a-no-style svelte-vlqexb");
     			attr_dev(a6, "href", "https://www.linkedin.com/in/gracias-claude/");
     			add_location(a6, file$8, 138, 10, 4399);
-    			attr_dev(p3, "class", " px-1 border-transparent inline  border-b-2 bottom-1 relative hover:border-teal-600 focus:outline-none outline-none");
+    			attr_dev(p3, "class", "px-1 border-transparent inline border-b-2 bottom-1 relative hover:border-teal-600 focus:outline-none outline-none");
     			add_location(p3, file$8, 135, 8, 4242);
     			attr_dev(div3, "class", "lg:block lg:float-right hidden cursor-pointer");
     			add_location(div3, file$8, 100, 6, 3127);
-    			attr_dev(div4, "class", div4_class_value = "" + (null_to_empty(`lg:px-6 py-2 my-2 px-4 border-b-2 ${/*border*/ ctx[1]} flex justify-between`) + " svelte-vlqexb"));
+    			attr_dev(div4, "class", div4_class_value = "" + (null_to_empty(`lg:px-6 py-2 my-2 px-4 border-b-2 ${/*border*/ ctx[3]} flex justify-between`) + " svelte-vlqexb"));
     			add_location(div4, file$8, 46, 4, 1033);
     			attr_dev(div5, "class", "flex-1 font-mono");
     			add_location(div5, file$8, 43, 2, 977);
@@ -3022,15 +3097,15 @@ var app = (function () {
     				}
     			}
 
-    			if (!current || dirty & /*activeAbout*/ 4 && p0_class_value !== (p0_class_value = "" + (null_to_empty(`px-2 inline  border-transparent border-b-2  hover:border-red-400 ${/*activeAbout*/ ctx[2]}`) + " svelte-vlqexb"))) {
+    			if (!current || dirty & /*activeAbout*/ 1 && p0_class_value !== (p0_class_value = "" + (null_to_empty(`px-2 inline  border-transparent border-b-2  hover:border-red-400 ${/*activeAbout*/ ctx[0]}`) + " svelte-vlqexb"))) {
     				attr_dev(p0, "class", p0_class_value);
     			}
 
-    			if (!current || dirty & /*border*/ 2 && div4_class_value !== (div4_class_value = "" + (null_to_empty(`lg:px-6 py-2 my-2 px-4 border-b-2 ${/*border*/ ctx[1]} flex justify-between`) + " svelte-vlqexb"))) {
+    			if (!current || dirty & /*border*/ 8 && div4_class_value !== (div4_class_value = "" + (null_to_empty(`lg:px-6 py-2 my-2 px-4 border-b-2 ${/*border*/ ctx[3]} flex justify-between`) + " svelte-vlqexb"))) {
     				attr_dev(div4, "class", div4_class_value);
     			}
 
-    			if (/*toggle*/ ctx[0] === true) {
+    			if (/*toggle*/ ctx[2] === true) {
     				if (if_block1) {
     					if_block1.p(ctx, dirty);
     				} else {
@@ -3088,34 +3163,34 @@ var app = (function () {
     	let activeAbout;
     	let activeResume;
     	let { $$slots: slots = {}, $$scope } = $$props;
-    	validate_slots("Nav", slots, []);
+    	validate_slots('Nav', slots, []);
 
     	const handleMenuToggle = e => {
     		// show menu below
-    		$$invalidate(0, toggle = !toggle);
+    		$$invalidate(2, toggle = !toggle);
 
     		if (toggle) {
-    			$$invalidate(1, border = "border-red-600");
+    			$$invalidate(3, border = "border-red-600");
     			return;
     		}
 
-    		$$invalidate(1, border = "border-gray-600");
+    		$$invalidate(3, border = "border-gray-600");
     	};
 
     	const close = (menu = "") => {
-    		$$invalidate(0, toggle = false);
+    		$$invalidate(2, toggle = false);
 
     		switch (menu) {
     			case "about":
-    				$$invalidate(2, activeAbout = "border-red-400");
-    				$$invalidate(3, activeResume = "");
+    				$$invalidate(0, activeAbout = "border-red-400");
+    				$$invalidate(1, activeResume = "");
     				break;
     			case "resume":
-    				$$invalidate(2, activeAbout = "");
-    				$$invalidate(3, activeResume = "border-red-400");
+    				$$invalidate(0, activeAbout = "");
+    				$$invalidate(1, activeResume = "border-red-400");
     				break;
     			default:
-    				$$invalidate(2, activeAbout = "");
+    				$$invalidate(0, activeAbout = "");
     				actoveResume = "";
     				break;
     		}
@@ -3124,7 +3199,7 @@ var app = (function () {
     	const writable_props = [];
 
     	Object.keys($$props).forEach(key => {
-    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<Nav> was created with unknown prop '${key}'`);
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<Nav> was created with unknown prop '${key}'`);
     	});
 
     	const click_handler = () => close();
@@ -3139,33 +3214,33 @@ var app = (function () {
     		Icon,
     		handleMenuToggle,
     		close,
-    		toggle,
-    		border,
     		activeAbout,
-    		activeResume
+    		activeResume,
+    		toggle,
+    		border
     	});
 
     	$$self.$inject_state = $$props => {
-    		if ("toggle" in $$props) $$invalidate(0, toggle = $$props.toggle);
-    		if ("border" in $$props) $$invalidate(1, border = $$props.border);
-    		if ("activeAbout" in $$props) $$invalidate(2, activeAbout = $$props.activeAbout);
-    		if ("activeResume" in $$props) $$invalidate(3, activeResume = $$props.activeResume);
+    		if ('activeAbout' in $$props) $$invalidate(0, activeAbout = $$props.activeAbout);
+    		if ('activeResume' in $$props) $$invalidate(1, activeResume = $$props.activeResume);
+    		if ('toggle' in $$props) $$invalidate(2, toggle = $$props.toggle);
+    		if ('border' in $$props) $$invalidate(3, border = $$props.border);
     	};
 
     	if ($$props && "$$inject" in $$props) {
     		$$self.$inject_state($$props.$$inject);
     	}
 
-    	$$invalidate(0, toggle = false);
-    	$$invalidate(1, border = "border-gray-600");
-    	$$invalidate(2, activeAbout = "");
-    	$$invalidate(3, activeResume = "");
+    	$$invalidate(2, toggle = false);
+    	$$invalidate(3, border = "border-gray-600");
+    	$$invalidate(0, activeAbout = "");
+    	$$invalidate(1, activeResume = "");
 
     	return [
-    		toggle,
-    		border,
     		activeAbout,
     		activeResume,
+    		toggle,
+    		border,
     		handleMenuToggle,
     		close,
     		click_handler,
@@ -3189,7 +3264,7 @@ var app = (function () {
     	}
     }
 
-    /* src/components/Footer.svelte generated by Svelte v3.38.2 */
+    /* src/components/Footer.svelte generated by Svelte v3.50.1 */
     const file$7 = "src/components/Footer.svelte";
 
     function create_fragment$9(ctx) {
@@ -3210,9 +3285,9 @@ var app = (function () {
     			span = element("span");
     			span.textContent = "Gracias";
     			attr_dev(span, "class", "text-red-400");
-    			add_location(span, file$7, 13, 27, 579);
+    			add_location(span, file$7, 13, 27, 564);
     			attr_dev(h1, "class", "");
-    			add_location(h1, file$7, 13, 6, 558);
+    			add_location(h1, file$7, 13, 6, 543);
     			attr_dev(div0, "class", "");
     			add_location(div0, file$7, 9, 4, 288);
     			attr_dev(div1, "class", "sticky flex justify-center bg-secondary-hue w-full text-center border-t border-grey p-4 lg:bottom-0 lg:mt-24");
@@ -3251,11 +3326,11 @@ var app = (function () {
 
     function instance$9($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
-    	validate_slots("Footer", slots, []);
+    	validate_slots('Footer', slots, []);
     	const writable_props = [];
 
     	Object.keys($$props).forEach(key => {
-    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<Footer> was created with unknown prop '${key}'`);
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<Footer> was created with unknown prop '${key}'`);
     	});
 
     	$$self.$capture_state = () => ({ github, linkedinSquare, Icon });
@@ -3284,16 +3359,15 @@ var app = (function () {
      */
     function writable(value, start = noop) {
         let stop;
-        const subscribers = [];
+        const subscribers = new Set();
         function set(new_value) {
             if (safe_not_equal(value, new_value)) {
                 value = new_value;
                 if (stop) { // store is ready
                     const run_queue = !subscriber_queue.length;
-                    for (let i = 0; i < subscribers.length; i += 1) {
-                        const s = subscribers[i];
-                        s[1]();
-                        subscriber_queue.push(s, value);
+                    for (const subscriber of subscribers) {
+                        subscriber[1]();
+                        subscriber_queue.push(subscriber, value);
                     }
                     if (run_queue) {
                         for (let i = 0; i < subscriber_queue.length; i += 2) {
@@ -3309,17 +3383,14 @@ var app = (function () {
         }
         function subscribe(run, invalidate = noop) {
             const subscriber = [run, invalidate];
-            subscribers.push(subscriber);
-            if (subscribers.length === 1) {
+            subscribers.add(subscriber);
+            if (subscribers.size === 1) {
                 stop = start(set) || noop;
             }
             run(value);
             return () => {
-                const index = subscribers.indexOf(subscriber);
-                if (index !== -1) {
-                    subscribers.splice(index, 1);
-                }
-                if (subscribers.length === 0) {
+                subscribers.delete(subscriber);
+                if (subscribers.size === 0) {
                     stop();
                     stop = null;
                 }
@@ -3941,9 +4012,12 @@ var app = (function () {
       }
 
       function namedPath() {
-        const localisedPath = localisedPathName();
+        let localisedPath = localisedPathName();
+        if (localisedPath && !localisedPath.startsWith('/')) {
+          localisedPath = '/' + localisedPath;
+        }
 
-        return basePath ? `${basePath}/${localisedPath}` : localisedPath;
+        return basePath ? `${basePath}${localisedPath}` : localisedPath;
       }
 
       function routePath() {
@@ -4030,9 +4104,7 @@ var app = (function () {
 
         routes.forEach(function (route) {
           routerPath.updatedPath(route);
-          if (route.name !== '/') {
-            route.name = removeSlash(route.name);
-          }
+
           if (matchRoute(routerPath, route.name)) {
             let routePath = routerPath.routePath();
             redirectTo = RouterRedirect(route, redirectTo).path();
@@ -4095,7 +4167,8 @@ var app = (function () {
 
       function parseCurrentUrl(currentUrl, sitePrefix) {
         if (sitePrefix && sitePrefix.trim().length > 0) {
-          const noPrefixUrl = currentUrl.replace(sitePrefix + '/', '');
+          const replacePattern = currentUrl.endsWith(sitePrefix) ? sitePrefix : sitePrefix + "/";
+          const noPrefixUrl = currentUrl.replace(replacePattern, '');
           return UrlParser(noPrefixUrl);
         } else {
           return UrlParser(currentUrl);
@@ -4245,7 +4318,7 @@ var app = (function () {
       };
     }
 
-    /* node_modules/svelte-router-spa/src/components/route.svelte generated by Svelte v3.38.2 */
+    /* node_modules/svelte-router-spa/src/components/route.svelte generated by Svelte v3.50.1 */
 
     // (10:34) 
     function create_if_block_2(ctx) {
@@ -4311,7 +4384,7 @@ var app = (function () {
     			props: {
     				currentRoute: {
     					.../*currentRoute*/ ctx[0],
-    					component: ""
+    					component: ''
     				},
     				params: /*params*/ ctx[1]
     			},
@@ -4341,7 +4414,7 @@ var app = (function () {
 
     			if (dirty & /*currentRoute*/ 1) switch_instance_changes.currentRoute = {
     				.../*currentRoute*/ ctx[0],
-    				component: ""
+    				component: ''
     			};
 
     			if (dirty & /*params*/ 2) switch_instance_changes.params = /*params*/ ctx[1];
@@ -4406,7 +4479,7 @@ var app = (function () {
     	function switch_props(ctx) {
     		return {
     			props: {
-    				currentRoute: { .../*currentRoute*/ ctx[0], layout: "" },
+    				currentRoute: { .../*currentRoute*/ ctx[0], layout: '' },
     				params: /*params*/ ctx[1]
     			},
     			$$inline: true
@@ -4432,7 +4505,7 @@ var app = (function () {
     		},
     		p: function update(ctx, dirty) {
     			const switch_instance_changes = {};
-    			if (dirty & /*currentRoute*/ 1) switch_instance_changes.currentRoute = { .../*currentRoute*/ ctx[0], layout: "" };
+    			if (dirty & /*currentRoute*/ 1) switch_instance_changes.currentRoute = { .../*currentRoute*/ ctx[0], layout: '' };
     			if (dirty & /*params*/ 2) switch_instance_changes.params = /*params*/ ctx[1];
 
     			if (switch_value !== (switch_value = /*currentRoute*/ ctx[0].layout)) {
@@ -4587,25 +4660,25 @@ var app = (function () {
 
     function instance$8($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
-    	validate_slots("Route", slots, []);
+    	validate_slots('Route', slots, []);
     	let { currentRoute = {} } = $$props;
     	let { params = {} } = $$props;
-    	const writable_props = ["currentRoute", "params"];
+    	const writable_props = ['currentRoute', 'params'];
 
     	Object.keys($$props).forEach(key => {
-    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<Route> was created with unknown prop '${key}'`);
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<Route> was created with unknown prop '${key}'`);
     	});
 
     	$$self.$$set = $$props => {
-    		if ("currentRoute" in $$props) $$invalidate(0, currentRoute = $$props.currentRoute);
-    		if ("params" in $$props) $$invalidate(1, params = $$props.params);
+    		if ('currentRoute' in $$props) $$invalidate(0, currentRoute = $$props.currentRoute);
+    		if ('params' in $$props) $$invalidate(1, params = $$props.params);
     	};
 
     	$$self.$capture_state = () => ({ currentRoute, params });
 
     	$$self.$inject_state = $$props => {
-    		if ("currentRoute" in $$props) $$invalidate(0, currentRoute = $$props.currentRoute);
-    		if ("params" in $$props) $$invalidate(1, params = $$props.params);
+    		if ('currentRoute' in $$props) $$invalidate(0, currentRoute = $$props.currentRoute);
+    		if ('params' in $$props) $$invalidate(1, params = $$props.params);
     	};
 
     	if ($$props && "$$inject" in $$props) {
@@ -4645,7 +4718,7 @@ var app = (function () {
     	}
     }
 
-    /* node_modules/svelte-router-spa/src/components/router.svelte generated by Svelte v3.38.2 */
+    /* node_modules/svelte-router-spa/src/components/router.svelte generated by Svelte v3.50.1 */
 
     function create_fragment$7(ctx) {
     	let route;
@@ -4699,10 +4772,10 @@ var app = (function () {
 
     function instance$7($$self, $$props, $$invalidate) {
     	let $activeRoute;
-    	validate_store(activeRoute, "activeRoute");
+    	validate_store(activeRoute, 'activeRoute');
     	component_subscribe($$self, activeRoute, $$value => $$invalidate(0, $activeRoute = $$value));
     	let { $$slots: slots = {}, $$scope } = $$props;
-    	validate_slots("Router", slots, []);
+    	validate_slots('Router', slots, []);
     	let { routes = [] } = $$props;
     	let { options = {} } = $$props;
 
@@ -4710,15 +4783,15 @@ var app = (function () {
     		SpaRouter(routes, document.location.href, options).setActiveRoute();
     	});
 
-    	const writable_props = ["routes", "options"];
+    	const writable_props = ['routes', 'options'];
 
     	Object.keys($$props).forEach(key => {
-    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<Router> was created with unknown prop '${key}'`);
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<Router> was created with unknown prop '${key}'`);
     	});
 
     	$$self.$$set = $$props => {
-    		if ("routes" in $$props) $$invalidate(1, routes = $$props.routes);
-    		if ("options" in $$props) $$invalidate(2, options = $$props.options);
+    		if ('routes' in $$props) $$invalidate(1, routes = $$props.routes);
+    		if ('options' in $$props) $$invalidate(2, options = $$props.options);
     	};
 
     	$$self.$capture_state = () => ({
@@ -4732,8 +4805,8 @@ var app = (function () {
     	});
 
     	$$self.$inject_state = $$props => {
-    		if ("routes" in $$props) $$invalidate(1, routes = $$props.routes);
-    		if ("options" in $$props) $$invalidate(2, options = $$props.options);
+    		if ('routes' in $$props) $$invalidate(1, routes = $$props.routes);
+    		if ('options' in $$props) $$invalidate(2, options = $$props.options);
     	};
 
     	if ($$props && "$$inject" in $$props) {
@@ -4773,7 +4846,7 @@ var app = (function () {
     	}
     }
 
-    /* src/components/Section.svelte generated by Svelte v3.38.2 */
+    /* src/components/Section.svelte generated by Svelte v3.50.1 */
     const file$6 = "src/components/Section.svelte";
 
     function create_fragment$6(ctx) {
@@ -4863,9 +4936,9 @@ var app = (function () {
     			add_location(span3, file$6, 25, 132, 790);
     			attr_dev(p1, "class", "text-p-hue");
     			add_location(p1, file$6, 24, 6, 635);
-    			attr_dev(p2, "class", "mt-4 border-b-2 font-bold cursor-pointer  hover:border-red-400 focus:outline-none inline-block lg:mt-4 hover:shadow-sm");
+    			attr_dev(p2, "class", "mt-4 border-b-2 font-bold cursor-pointer hover:border-red-400 focus:outline-none inline-block lg:mt-4 hover:shadow-sm");
     			add_location(p2, file$6, 27, 6, 882);
-    			attr_dev(div0, "class", " m-6 lg:m-12 text-center lg:w-1/2");
+    			attr_dev(div0, "class", "m-6 lg:m-12 text-center lg:w-1/2");
     			add_location(div0, file$6, 17, 4, 357);
     			attr_dev(div1, "class", "flex justify-center pt-24 font-mono");
     			add_location(div1, file$6, 16, 2, 303);
@@ -4955,7 +5028,7 @@ var app = (function () {
 
     function instance$6($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
-    	validate_slots("Section", slots, []);
+    	validate_slots('Section', slots, []);
     	let scrollY;
 
     	function autoScroll() {
@@ -4966,7 +5039,7 @@ var app = (function () {
     	const writable_props = [];
 
     	Object.keys($$props).forEach(key => {
-    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<Section> was created with unknown prop '${key}'`);
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<Section> was created with unknown prop '${key}'`);
     	});
 
     	function onwindowscroll() {
@@ -4981,7 +5054,7 @@ var app = (function () {
     	});
 
     	$$self.$inject_state = $$props => {
-    		if ("scrollY" in $$props) $$invalidate(0, scrollY = $$props.scrollY);
+    		if ('scrollY' in $$props) $$invalidate(0, scrollY = $$props.scrollY);
     	};
 
     	if ($$props && "$$inject" in $$props) {
@@ -5005,7 +5078,7 @@ var app = (function () {
     	}
     }
 
-    /* src/screens/mobile/ProjectSection.svelte generated by Svelte v3.38.2 */
+    /* src/screens/mobile/ProjectSection.svelte generated by Svelte v3.50.1 */
 
     const file$5 = "src/screens/mobile/ProjectSection.svelte";
 
@@ -5057,7 +5130,7 @@ var app = (function () {
     			attr_dev(div0, "class", "pl-6");
     			add_location(div0, file$5, 7, 6, 131);
     			attr_dev(img, "class", "absolute inset-0 w-full h-full object-cover object-center");
-    			if (img.src !== (img_src_value = /*project*/ ctx[1].img)) attr_dev(img, "src", img_src_value);
+    			if (!src_url_equal(img.src, img_src_value = /*project*/ ctx[1].img)) attr_dev(img, "src", img_src_value);
     			add_location(img, file$5, 15, 8, 388);
     			attr_dev(div1, "class", "relative h-48 m-5");
     			add_location(div1, file$5, 14, 6, 348);
@@ -5083,7 +5156,7 @@ var app = (function () {
     			if (dirty & /*projects*/ 1 && t0_value !== (t0_value = /*project*/ ctx[1].title + "")) set_data_dev(t0, t0_value);
     			if (dirty & /*projects*/ 1 && t2_value !== (t2_value = /*project*/ ctx[1].text + "")) set_data_dev(t2, t2_value);
 
-    			if (dirty & /*projects*/ 1 && img.src !== (img_src_value = /*project*/ ctx[1].img)) {
+    			if (dirty & /*projects*/ 1 && !src_url_equal(img.src, img_src_value = /*project*/ ctx[1].img)) {
     				attr_dev(img, "src", img_src_value);
     			}
     		},
@@ -5179,22 +5252,22 @@ var app = (function () {
 
     function instance$5($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
-    	validate_slots("ProjectSection", slots, []);
+    	validate_slots('ProjectSection', slots, []);
     	let { projects } = $$props;
-    	const writable_props = ["projects"];
+    	const writable_props = ['projects'];
 
     	Object.keys($$props).forEach(key => {
-    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<ProjectSection> was created with unknown prop '${key}'`);
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<ProjectSection> was created with unknown prop '${key}'`);
     	});
 
     	$$self.$$set = $$props => {
-    		if ("projects" in $$props) $$invalidate(0, projects = $$props.projects);
+    		if ('projects' in $$props) $$invalidate(0, projects = $$props.projects);
     	};
 
     	$$self.$capture_state = () => ({ projects });
 
     	$$self.$inject_state = $$props => {
-    		if ("projects" in $$props) $$invalidate(0, projects = $$props.projects);
+    		if ('projects' in $$props) $$invalidate(0, projects = $$props.projects);
     	};
 
     	if ($$props && "$$inject" in $$props) {
@@ -5219,7 +5292,7 @@ var app = (function () {
     		const { ctx } = this.$$;
     		const props = options.props || {};
 
-    		if (/*projects*/ ctx[0] === undefined && !("projects" in props)) {
+    		if (/*projects*/ ctx[0] === undefined && !('projects' in props)) {
     			console.warn("<ProjectSection> was created without expected prop 'projects'");
     		}
     	}
@@ -5243,7 +5316,7 @@ var app = (function () {
         };
     }
 
-    /* src/pages/Home.svelte generated by Svelte v3.38.2 */
+    /* src/pages/Home.svelte generated by Svelte v3.50.1 */
 
     const { console: console_1 } = globals;
     const file$4 = "src/pages/Home.svelte";
@@ -5374,7 +5447,7 @@ var app = (function () {
     			attr_dev(div0, "class", "w-1/2 p-6");
     			add_location(div0, file$4, 41, 6, 1493);
     			attr_dev(img, "class", "absolute inset-0 w-full h-full object-cover object-center");
-    			if (img.src !== (img_src_value = /*project*/ ctx[4].img)) attr_dev(img, "src", img_src_value);
+    			if (!src_url_equal(img.src, img_src_value = /*project*/ ctx[4].img)) attr_dev(img, "src", img_src_value);
     			add_location(img, file$4, 49, 8, 1765);
     			attr_dev(div1, "class", "w-1/2 relative p-24");
     			add_location(div1, file$4, 48, 6, 1723);
@@ -5560,7 +5633,7 @@ var app = (function () {
 
     function instance$4($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
-    	validate_slots("Home", slots, []);
+    	validate_slots('Home', slots, []);
 
     	const projects = [
     		{
@@ -5583,7 +5656,7 @@ var app = (function () {
     	const writable_props = [];
 
     	Object.keys($$props).forEach(key => {
-    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console_1.warn(`<Home> was created with unknown prop '${key}'`);
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console_1.warn(`<Home> was created with unknown prop '${key}'`);
     	});
 
     	function onwindowscroll() {
@@ -5600,8 +5673,8 @@ var app = (function () {
     	});
 
     	$$self.$inject_state = $$props => {
-    		if ("y" in $$props) $$invalidate(0, y = $$props.y);
-    		if ("visible" in $$props) $$invalidate(1, visible = $$props.visible);
+    		if ('y' in $$props) $$invalidate(0, y = $$props.y);
+    		if ('visible' in $$props) $$invalidate(1, visible = $$props.visible);
     	};
 
     	if ($$props && "$$inject" in $$props) {
@@ -5634,7 +5707,7 @@ var app = (function () {
     	}
     }
 
-    /* src/pages/About.svelte generated by Svelte v3.38.2 */
+    /* src/pages/About.svelte generated by Svelte v3.50.1 */
 
     const file$3 = "src/pages/About.svelte";
 
@@ -5756,71 +5829,72 @@ var app = (function () {
     			div23 = element("div");
     			div23.textContent = "C#";
     			attr_dev(img, "class", "object-cover shadow-md rounded-3xl lg:h-3/5 lg:w-3/6");
-    			if (img.src !== (img_src_value = "https://personal-foto.s3.us-west-1.amazonaws.com/gracias.jpeg")) attr_dev(img, "src", img_src_value);
+    			if (!src_url_equal(img.src, img_src_value = "images/gracias.jpg")) attr_dev(img, "src", img_src_value);
+    			attr_dev(img, "alt", "profile picture");
     			add_location(img, file$3, 14, 12, 458);
     			attr_dev(div0, "class", "lg:flex lg:justify-end");
     			add_location(div0, file$3, 13, 10, 409);
     			attr_dev(div1, "class", "lg:aspect-h-1 lg:aspect-w-1 aspect-w-3 aspect-h-7");
     			add_location(div1, file$3, 12, 8, 335);
     			attr_dev(h10, "class", "lg:text-7xl text-5xl font-bold text-center lg:text-left");
-    			add_location(h10, file$3, 22, 10, 724);
+    			add_location(h10, file$3, 23, 10, 717);
     			attr_dev(p0, "class", "pt-4 lg:text-2xl");
-    			add_location(p0, file$3, 25, 10, 844);
+    			add_location(p0, file$3, 26, 10, 837);
     			attr_dev(div2, "class", "lg:w-3/4 lg:mt-6 -my-60");
-    			add_location(div2, file$3, 21, 8, 676);
-    			attr_dev(div3, "class", "lg:grid lg:gap-6 lg:grid-cols-2 lg:rounded-lg  ");
+    			add_location(div2, file$3, 22, 8, 669);
+    			attr_dev(div3, "class", "lg:grid lg:gap-6 lg:grid-cols-2 lg:rounded-lg ");
     			add_location(div3, file$3, 11, 6, 265);
     			attr_dev(div4, "class", "lg:grid lg:grid-cols-1 lg:justify-center lg:mx-6 lg:mt-24 mt-12 mx-4 ");
     			add_location(div4, file$3, 7, 4, 137);
-    			add_location(br, file$3, 39, 22, 1333);
-    			attr_dev(h11, "class", "lg:text-6xl  text-5xl font-bold lg:text-left text-center");
-    			add_location(h11, file$3, 38, 10, 1241);
+    			add_location(br, file$3, 40, 22, 1326);
+    			attr_dev(h11, "class", "lg:text-6xl text-5xl font-bold lg:text-left text-center");
+    			add_location(h11, file$3, 39, 10, 1234);
     			attr_dev(p1, "class", "pt-4 text-lg");
-    			add_location(p1, file$3, 41, 10, 1372);
+    			add_location(p1, file$3, 42, 10, 1365);
     			attr_dev(div5, "class", "grid lg:justify-end");
-    			add_location(div5, file$3, 37, 8, 1197);
-    			attr_dev(div6, "class", "pt-4 lg:w-1/2  mb-12");
-    			add_location(div6, file$3, 36, 6, 1154);
+    			add_location(div5, file$3, 38, 8, 1190);
+    			attr_dev(div6, "class", "pt-4 lg:w-1/2 mb-12");
+    			add_location(div6, file$3, 37, 6, 1147);
     			attr_dev(div7, "class", "text-xs font-normal leading-none max-w-full flex-initial");
-    			add_location(div7, file$3, 51, 10, 1907);
+    			add_location(div7, file$3, 52, 10, 1900);
     			attr_dev(div8, "class", "lg:flex lg:justify-center lg:items-center lg:m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400 ");
-    			add_location(div8, file$3, 48, 8, 1714);
+    			add_location(div8, file$3, 49, 8, 1707);
     			attr_dev(div9, "class", "text-xs font-normal leading-none max-w-full flex-initial");
-    			add_location(div9, file$3, 61, 10, 2509);
+    			add_location(div9, file$3, 62, 10, 2502);
     			attr_dev(div10, "class", "flex justify-center items-center m-1 font-medium lg:py-1 px-2 py-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400 ");
-    			add_location(div10, file$3, 55, 8, 2036);
+    			add_location(div10, file$3, 56, 8, 2029);
     			attr_dev(div11, "class", "text-xs font-normal leading-none max-w-full flex-initial");
-    			add_location(div11, file$3, 68, 10, 2818);
+    			add_location(div11, file$3, 69, 10, 2811);
     			attr_dev(div12, "class", "flex justify-center items-center m-1 font-medium lg:py-1 px-2 py-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400 ");
-    			add_location(div12, file$3, 65, 8, 2637);
+    			add_location(div12, file$3, 66, 8, 2630);
     			attr_dev(div13, "class", "text-xs font-normal leading-none max-w-full flex-initial");
-    			add_location(div13, file$3, 79, 10, 3418);
+    			add_location(div13, file$3, 80, 10, 3411);
     			attr_dev(div14, "class", "flex justify-center items-center m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400 ");
-    			add_location(div14, file$3, 73, 8, 2945);
+    			add_location(div14, file$3, 74, 8, 2938);
     			attr_dev(div15, "class", "text-xs font-normal leading-none max-w-full flex-initial");
-    			add_location(div15, file$3, 89, 10, 4018);
+    			add_location(div15, file$3, 90, 10, 4011);
     			attr_dev(div16, "class", "flex justify-center items-center m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400 ");
-    			add_location(div16, file$3, 83, 8, 3545);
+    			add_location(div16, file$3, 84, 8, 3538);
     			attr_dev(div17, "class", "text-xs font-normal leading-none max-w-full flex-initial");
-    			add_location(div17, file$3, 99, 10, 4618);
+    			add_location(div17, file$3, 100, 10, 4611);
     			attr_dev(div18, "class", "flex justify-center items-center m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400 ");
-    			add_location(div18, file$3, 93, 8, 4145);
+    			add_location(div18, file$3, 94, 8, 4138);
     			attr_dev(div19, "class", "text-xs font-normal leading-none max-w-full flex-initial");
-    			add_location(div19, file$3, 109, 10, 5221);
+    			add_location(div19, file$3, 110, 10, 5214);
     			attr_dev(div20, "class", "flex justify-center items-center m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400 ");
-    			add_location(div20, file$3, 103, 8, 4748);
+    			add_location(div20, file$3, 104, 8, 4741);
     			attr_dev(div21, "class", "text-xs font-normal leading-none max-w-full flex-initial");
-    			add_location(div21, file$3, 119, 10, 5823);
+    			add_location(div21, file$3, 120, 10, 5816);
     			attr_dev(div22, "class", "flex justify-center items-center m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400 ");
-    			add_location(div22, file$3, 113, 8, 5350);
+    			add_location(div22, file$3, 114, 8, 5343);
     			attr_dev(div23, "class", "text-xs font-normal leading-none max-w-full flex-initial");
-    			add_location(div23, file$3, 129, 10, 6421);
+    			add_location(div23, file$3, 130, 10, 6414);
     			attr_dev(div24, "class", "flex justify-center items-center m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400 ");
-    			add_location(div24, file$3, 123, 8, 5948);
-    			attr_dev(div25, "class", " mt-6 grid grid-cols-4 gap-2 h-0 text-center ");
-    			add_location(div25, file$3, 47, 6, 1646);
-    			attr_dev(div26, "class", "lg:flex rounded-lg lg:px-32 lg:-my-48  my-72 lg:ml-40 justify-center");
-    			add_location(div26, file$3, 33, 4, 1054);
+    			add_location(div24, file$3, 124, 8, 5941);
+    			attr_dev(div25, "class", "mt-6 grid grid-cols-4 gap-2 h-0 text-center ");
+    			add_location(div25, file$3, 48, 6, 1639);
+    			attr_dev(div26, "class", "lg:flex rounded-lg lg:px-32 lg:-my-48 my-72 lg:ml-40 justify-center");
+    			add_location(div26, file$3, 34, 4, 1047);
     			attr_dev(div27, "class", "bg-white lg:h-screen h-full font-mono");
     			add_location(div27, file$3, 5, 2, 62);
     			add_location(main, file$3, 4, 0, 53);
@@ -5901,18 +5975,18 @@ var app = (function () {
 
     function instance$3($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
-    	validate_slots("About", slots, []);
+    	validate_slots('About', slots, []);
     	let pic = "image/gracias.jpg";
     	const writable_props = [];
 
     	Object.keys($$props).forEach(key => {
-    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<About> was created with unknown prop '${key}'`);
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<About> was created with unknown prop '${key}'`);
     	});
 
     	$$self.$capture_state = () => ({ pic });
 
     	$$self.$inject_state = $$props => {
-    		if ("pic" in $$props) pic = $$props.pic;
+    		if ('pic' in $$props) pic = $$props.pic;
     	};
 
     	if ($$props && "$$inject" in $$props) {
@@ -5936,7 +6010,7 @@ var app = (function () {
     	}
     }
 
-    /* src/pages/Error.svelte generated by Svelte v3.38.2 */
+    /* src/pages/Error.svelte generated by Svelte v3.50.1 */
 
     const { Error: Error_1 } = globals;
     const file$2 = "src/pages/Error.svelte";
@@ -5981,11 +6055,11 @@ var app = (function () {
 
     function instance$2($$self, $$props) {
     	let { $$slots: slots = {}, $$scope } = $$props;
-    	validate_slots("Error", slots, []);
+    	validate_slots('Error', slots, []);
     	const writable_props = [];
 
     	Object.keys($$props).forEach(key => {
-    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<Error> was created with unknown prop '${key}'`);
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<Error> was created with unknown prop '${key}'`);
     	});
 
     	return [];
@@ -6005,7 +6079,7 @@ var app = (function () {
     	}
     }
 
-    /* src/pages/Resume.svelte generated by Svelte v3.38.2 */
+    /* src/pages/Resume.svelte generated by Svelte v3.50.1 */
 
     const file$1 = "src/pages/Resume.svelte";
 
@@ -6024,7 +6098,7 @@ var app = (function () {
     			t1 = space();
     			img = element("img");
     			add_location(h1, file$1, 5, 2, 68);
-    			if (img.src !== (img_src_value = "https://personal-foto.s3.us-west-1.amazonaws.com/resume.png")) attr_dev(img, "src", img_src_value);
+    			if (!src_url_equal(img.src, img_src_value = "https://personal-foto.s3.us-west-1.amazonaws.com/resume.png")) attr_dev(img, "src", img_src_value);
     			attr_dev(img, "alt", "resume");
     			add_location(img, file$1, 7, 2, 108);
     			add_location(main, file$1, 4, 0, 59);
@@ -6059,18 +6133,18 @@ var app = (function () {
 
     function instance$1($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
-    	validate_slots("Resume", slots, []);
+    	validate_slots('Resume', slots, []);
     	let resumeImg = "image/resume.png";
     	const writable_props = [];
 
     	Object.keys($$props).forEach(key => {
-    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<Resume> was created with unknown prop '${key}'`);
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<Resume> was created with unknown prop '${key}'`);
     	});
 
     	$$self.$capture_state = () => ({ resumeImg });
 
     	$$self.$inject_state = $$props => {
-    		if ("resumeImg" in $$props) resumeImg = $$props.resumeImg;
+    		if ('resumeImg' in $$props) resumeImg = $$props.resumeImg;
     	};
 
     	if ($$props && "$$inject" in $$props) {
@@ -7419,7 +7493,7 @@ var app = (function () {
     anime.penner = penner;
     anime.random = function (min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; };
 
-    /* src/App.svelte generated by Svelte v3.38.2 */
+    /* src/App.svelte generated by Svelte v3.50.1 */
     const file = "src/App.svelte";
 
     function create_fragment(ctx) {
@@ -7501,18 +7575,18 @@ var app = (function () {
 
     function instance($$self, $$props, $$invalidate) {
     	let { $$slots: slots = {}, $$scope } = $$props;
-    	validate_slots("App", slots, []);
+    	validate_slots('App', slots, []);
     	let options = { gaPageviews: true };
     	const writable_props = [];
 
     	Object.keys($$props).forEach(key => {
-    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== "$$") console.warn(`<App> was created with unknown prop '${key}'`);
+    		if (!~writable_props.indexOf(key) && key.slice(0, 2) !== '$$' && key !== 'slot') console.warn(`<App> was created with unknown prop '${key}'`);
     	});
 
     	$$self.$capture_state = () => ({ Nav, Footer, Router, routes, options });
 
     	$$self.$inject_state = $$props => {
-    		if ("options" in $$props) $$invalidate(0, options = $$props.options);
+    		if ('options' in $$props) $$invalidate(0, options = $$props.options);
     	};
 
     	if ($$props && "$$inject" in $$props) {
@@ -7545,5 +7619,5 @@ var app = (function () {
 
     return app;
 
-}());
+})();
 //# sourceMappingURL=bundle.js.map

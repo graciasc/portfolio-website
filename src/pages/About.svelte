@@ -14,7 +14,8 @@
           <div class="lg:flex lg:justify-end">
             <img
               class="object-cover shadow-md rounded-3xl lg:h-3/5 lg:w-3/6"
-              src="https://personal-foto.s3.us-west-1.amazonaws.com/gracias.jpeg"
+              src="images/gracias.jpg"
+              alt="profile picture"
             />
           </div>
         </div>
