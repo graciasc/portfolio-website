@@ -62,7 +62,7 @@
               <li class="border-transparent border-b-2 hover:border-gray-600">
                 <a
                   class="a-no-style"
-                  href="https://personal-foto.s3.us-west-1.amazonaws.com/resume.pdf"
+                  href="images/graciasc.pdf"
                   download
                 >
                   Resume
@@ -112,7 +112,7 @@
           <a
             target="_blank"
             class="a-no-style"
-            href="https://personal-foto.s3.us-west-1.amazonaws.com/resume.pdf"
+            href="images/graciasc.pdf"
             download
           >
             Resume</a
@@ -170,7 +170,7 @@
               on:click={() => close()}
               target="_blank"
               class="a-no-style"
-              href="https://personal-foto.s3.us-west-1.amazonaws.com/resume.pdf"
+              href="images/graciasc.pdf"
               download
             >
               Resume
