@@ -5,5 +5,5 @@
 <main>
   <h1>Resume page</h1>
   <!-- Image -->
-  <img src='https://personal-foto.s3.us-west-1.amazonaws.com/resume.png' alt="resume"/>  
+  <img src='images/Gracias 2022 v3-2.pdf' alt="resume"/>
 </main>
