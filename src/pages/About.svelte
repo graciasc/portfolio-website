@@ -10,7 +10,7 @@
     >
       <!-- CONTAINERS  -->
       <div class="lg:grid lg:gap-6 lg:grid-cols-2 lg:rounded-lg  ">
-        <div class="lg:aspect-h-1 lg:aspect-w-1 aspect-w-3 aspect-h-7">
+        <div class="lg:aspect-h-1 lg:aspect-w-1 aspect-w-3 aspect-h-4">
           <div class="lg:flex lg:justify-end">
             <img
               class="object-cover shadow-md rounded-3xl lg:h-3/5 lg:w-3/6"
