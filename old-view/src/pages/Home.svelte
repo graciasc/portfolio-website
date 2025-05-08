@@ -1,7 +1,7 @@
 <script>
   import Hero from "../components/Section.svelte";
   import MobileSection from "../screens/mobile/ProjectSection.svelte";
-	import { fade } from 'svelte/transition';
+  import { fade } from "svelte/transition";
 
   const projects = [
     {
@@ -16,45 +16,47 @@
     },
   ];
   // do animation based on y
-   let y;
-   let visible = false
-   console.log(visible)
-   $: if (y === 0) {
-     //add button to unfade below
-     visible = true
+  let y;
+  let visible = false;
+  console.log(visible);
+  $: if (y === 0) {
+    //add button to unfade below
+    visible = true;
   }
 </script>
+
 <!-- <svelte:window on:scrollY={handleKeydown}/>  -->
-<svelte:window bind:scrollY={y}/>
+<svelte:window bind:scrollY={y} />
 
 <main>
-  <Hero scrollY={y}/>
+  <Hero scrollY={y} />
   <!-- Spacing -->
-  <div class="border-b-2 border-gray-700 pt-6 lg:p-12 " />
+  <div class="border-b-2 border-gray-700 pt-6 lg:p-12" />
   <!-- DESKTOP Section -->
   {#if visible}
-  {#each projects as project, i}
-    <div
-      transition in:fade="{{ duration: 2000 }}"
-      class="lg:flex justify-center m-5 lg:m-24 bg-main relative hidden"
-      id={`section${i}`}
-    >
-      <div class="w-1/2 p-6">
-        <h1 class="text-h-hue text-4xl font-bold leading-9 pt-4">
-          {project.title}
-        </h1>
-        <p class="text-p-hue text-lg pt-6">{project.text}</p>
-        <button />
+    {#each projects as project, i}
+      <div
+        transition
+        in:fade={{ duration: 2000 }}
+        class="lg:flex justify-center m-5 lg:m-24 bg-main relative hidden"
+        id={`section${i}`}
+      >
+        <div class="w-1/2 p-6">
+          <h1 class="text-h-hue text-4xl font-bold leading-9 pt-4">
+            {project.title}
+          </h1>
+          <p class="text-p-hue text-lg pt-6">{project.text}</p>
+          <button />
+        </div>
+        <div class="w-1/2 relative p-24">
+          <img
+            class="absolute inset-0 w-full h-full object-cover object-center"
+            src={project.img}
+          />
+        </div>
       </div>
-      <div class="w-1/2 relative p-24">
-        <img
-          class="absolute inset-0 w-full h-full object-cover object-center"
-          src={project.img}
-        />
-      </div>
-    </div>
     {/each}
-    {/if}
+  {/if}
 
   <!-- Mobile Sections -->
   <MobileSection {projects} />

@@ -5328,7 +5328,7 @@ var app = (function () {
     	return child_ctx;
     }
 
-    // (35:2) {#if visible}
+    // (36:2) {#if visible}
     function create_if_block(ctx) {
     	let each_1_anchor;
     	let each_value = /*projects*/ ctx[2];
@@ -5397,14 +5397,14 @@ var app = (function () {
     		block,
     		id: create_if_block.name,
     		type: "if",
-    		source: "(35:2) {#if visible}",
+    		source: "(36:2) {#if visible}",
     		ctx
     	});
 
     	return block;
     }
 
-    // (36:2) {#each projects as project, i}
+    // (37:4) {#each projects as project, i}
     function create_each_block(ctx) {
     	let div2;
     	let div0;
@@ -5440,21 +5440,21 @@ var app = (function () {
     			img = element("img");
     			t5 = space();
     			attr_dev(h1, "class", "text-h-hue text-4xl font-bold leading-9 pt-4");
-    			add_location(h1, file$4, 42, 8, 1525);
+    			add_location(h1, file$4, 44, 10, 1547);
     			attr_dev(p, "class", "text-p-hue text-lg pt-6");
-    			add_location(p, file$4, 45, 8, 1631);
-    			add_location(button, file$4, 46, 8, 1693);
+    			add_location(p, file$4, 47, 10, 1659);
+    			add_location(button, file$4, 48, 10, 1723);
     			attr_dev(div0, "class", "w-1/2 p-6");
-    			add_location(div0, file$4, 41, 6, 1493);
+    			add_location(div0, file$4, 43, 8, 1513);
     			attr_dev(img, "class", "absolute inset-0 w-full h-full object-cover object-center");
     			if (!src_url_equal(img.src, img_src_value = /*project*/ ctx[4].img)) attr_dev(img, "src", img_src_value);
-    			add_location(img, file$4, 49, 8, 1765);
+    			add_location(img, file$4, 51, 10, 1801);
     			attr_dev(div1, "class", "w-1/2 relative p-24");
-    			add_location(div1, file$4, 48, 6, 1723);
+    			add_location(div1, file$4, 50, 8, 1757);
     			attr_dev(div2, "transition", "");
     			attr_dev(div2, "class", "lg:flex justify-center m-5 lg:m-24 bg-main relative hidden");
     			attr_dev(div2, "id", `section${/*i*/ ctx[6]}`);
-    			add_location(div2, file$4, 36, 4, 1330);
+    			add_location(div2, file$4, 37, 6, 1334);
     		},
     		m: function mount(target, anchor) {
     			insert_dev(target, div2, anchor);
@@ -5490,7 +5490,7 @@ var app = (function () {
     		block,
     		id: create_each_block.name,
     		type: "each",
-    		source: "(36:2) {#each projects as project, i}",
+    		source: "(37:4) {#each projects as project, i}",
     		ctx
     	});
 
@@ -5539,9 +5539,9 @@ var app = (function () {
     			if (if_block) if_block.c();
     			t2 = space();
     			create_component(mobilesection.$$.fragment);
-    			attr_dev(div, "class", "border-b-2 border-gray-700 pt-6 lg:p-12 ");
-    			add_location(div, file$4, 32, 2, 1193);
-    			add_location(main, file$4, 29, 0, 1143);
+    			attr_dev(div, "class", "border-b-2 border-gray-700 pt-6 lg:p-12");
+    			add_location(div, file$4, 33, 2, 1194);
+    			add_location(main, file$4, 30, 0, 1143);
     		},
     		l: function claim(nodes) {
     			throw new Error("options.hydrate only works if the component was compiled with the `hydratable: true` option");
@@ -5779,7 +5779,7 @@ var app = (function () {
     			h10.textContent = "Hello World!";
     			t2 = space();
     			p0 = element("p");
-    			p0.textContent = "I have a desire to excel and continuously improve in my work. Learn more\n            about my journey below.";
+    			p0.textContent = "I have a desire to excel and continuously improve in my work. Learn\n            more about my journey below.";
     			t4 = space();
     			div26 = element("div");
     			div6 = element("div");
@@ -5790,7 +5790,7 @@ var app = (function () {
     			t6 = text(" So Far!");
     			t7 = space();
     			p1 = element("p");
-    			p1.textContent = "Always up for a challenge, I have worked for start-ups at the same time doing University.\n             Currently, I work as a Software Engineer for a widely innovative a fin-tech company.";
+    			p1.textContent = "Always up for a challenge, I have worked for start-ups at the same\n            time doing University. Currently, I work as a Software Engineer for\n            a widely innovative a fin-tech company.";
     			t9 = space();
     			div25 = element("div");
     			div8 = element("div");
@@ -5831,70 +5831,70 @@ var app = (function () {
     			attr_dev(img, "class", "object-cover shadow-md rounded-3xl lg:h-3/5 lg:w-3/6");
     			if (!src_url_equal(img.src, img_src_value = "images/gracias.jpg")) attr_dev(img, "src", img_src_value);
     			attr_dev(img, "alt", "profile picture");
-    			add_location(img, file$3, 14, 12, 458);
+    			add_location(img, file$3, 14, 12, 455);
     			attr_dev(div0, "class", "lg:flex lg:justify-end");
-    			add_location(div0, file$3, 13, 10, 409);
+    			add_location(div0, file$3, 13, 10, 406);
     			attr_dev(div1, "class", "lg:aspect-h-1 lg:aspect-w-1 aspect-w-3 aspect-h-4");
-    			add_location(div1, file$3, 12, 8, 335);
+    			add_location(div1, file$3, 12, 8, 332);
     			attr_dev(h10, "class", "lg:text-7xl text-5xl font-bold text-center lg:text-left");
-    			add_location(h10, file$3, 23, 10, 717);
+    			add_location(h10, file$3, 23, 10, 714);
     			attr_dev(p0, "class", "pt-4 lg:text-2xl");
-    			add_location(p0, file$3, 26, 10, 837);
+    			add_location(p0, file$3, 26, 10, 834);
     			attr_dev(div2, "class", "lg:w-3/4 lg:mt-6 -my-60");
-    			add_location(div2, file$3, 22, 8, 669);
-    			attr_dev(div3, "class", "lg:grid lg:gap-6 lg:grid-cols-2 lg:rounded-lg ");
-    			add_location(div3, file$3, 11, 6, 265);
-    			attr_dev(div4, "class", "lg:grid lg:grid-cols-1 lg:justify-center lg:mx-6 lg:mt-24 mt-12 mx-4 ");
+    			add_location(div2, file$3, 22, 8, 666);
+    			attr_dev(div3, "class", "lg:grid lg:gap-6 lg:grid-cols-2 lg:rounded-lg");
+    			add_location(div3, file$3, 11, 6, 264);
+    			attr_dev(div4, "class", "lg:grid lg:grid-cols-1 lg:justify-center lg:mx-6 lg:mt-24 mt-12 mx-4");
     			add_location(div4, file$3, 7, 4, 137);
-    			add_location(br, file$3, 40, 22, 1326);
+    			add_location(br, file$3, 40, 22, 1319);
     			attr_dev(h11, "class", "lg:text-6xl text-5xl font-bold lg:text-left text-center");
-    			add_location(h11, file$3, 39, 10, 1234);
+    			add_location(h11, file$3, 39, 10, 1228);
     			attr_dev(p1, "class", "pt-4 text-lg");
-    			add_location(p1, file$3, 42, 10, 1365);
+    			add_location(p1, file$3, 42, 10, 1360);
     			attr_dev(div5, "class", "grid lg:justify-end");
-    			add_location(div5, file$3, 38, 8, 1190);
+    			add_location(div5, file$3, 38, 8, 1184);
     			attr_dev(div6, "class", "pt-4 lg:w-1/2 mb-12");
-    			add_location(div6, file$3, 37, 6, 1147);
+    			add_location(div6, file$3, 37, 6, 1142);
     			attr_dev(div7, "class", "text-xs font-normal leading-none max-w-full flex-initial");
-    			add_location(div7, file$3, 52, 10, 1900);
-    			attr_dev(div8, "class", "lg:flex lg:justify-center lg:items-center lg:m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400 ");
-    			add_location(div8, file$3, 49, 8, 1707);
+    			add_location(div7, file$3, 54, 10, 1905);
+    			attr_dev(div8, "class", "lg:flex lg:justify-center lg:items-center lg:m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400");
+    			add_location(div8, file$3, 51, 8, 1713);
     			attr_dev(div9, "class", "text-xs font-normal leading-none max-w-full flex-initial");
-    			add_location(div9, file$3, 62, 10, 2502);
-    			attr_dev(div10, "class", "flex justify-center items-center m-1 font-medium lg:py-1 px-2 py-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400 ");
-    			add_location(div10, file$3, 56, 8, 2029);
+    			add_location(div9, file$3, 64, 10, 2506);
+    			attr_dev(div10, "class", "flex justify-center items-center m-1 font-medium lg:py-1 px-2 py-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400");
+    			add_location(div10, file$3, 58, 8, 2034);
     			attr_dev(div11, "class", "text-xs font-normal leading-none max-w-full flex-initial");
-    			add_location(div11, file$3, 69, 10, 2811);
-    			attr_dev(div12, "class", "flex justify-center items-center m-1 font-medium lg:py-1 px-2 py-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400 ");
-    			add_location(div12, file$3, 66, 8, 2630);
+    			add_location(div11, file$3, 71, 10, 2814);
+    			attr_dev(div12, "class", "flex justify-center items-center m-1 font-medium lg:py-1 px-2 py-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400");
+    			add_location(div12, file$3, 68, 8, 2634);
     			attr_dev(div13, "class", "text-xs font-normal leading-none max-w-full flex-initial");
-    			add_location(div13, file$3, 80, 10, 3411);
-    			attr_dev(div14, "class", "flex justify-center items-center m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400 ");
-    			add_location(div14, file$3, 74, 8, 2938);
+    			add_location(div13, file$3, 82, 10, 3413);
+    			attr_dev(div14, "class", "flex justify-center items-center m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400");
+    			add_location(div14, file$3, 76, 8, 2941);
     			attr_dev(div15, "class", "text-xs font-normal leading-none max-w-full flex-initial");
-    			add_location(div15, file$3, 90, 10, 4011);
-    			attr_dev(div16, "class", "flex justify-center items-center m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400 ");
-    			add_location(div16, file$3, 84, 8, 3538);
+    			add_location(div15, file$3, 92, 10, 4012);
+    			attr_dev(div16, "class", "flex justify-center items-center m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400");
+    			add_location(div16, file$3, 86, 8, 3540);
     			attr_dev(div17, "class", "text-xs font-normal leading-none max-w-full flex-initial");
-    			add_location(div17, file$3, 100, 10, 4611);
-    			attr_dev(div18, "class", "flex justify-center items-center m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400 ");
-    			add_location(div18, file$3, 94, 8, 4138);
+    			add_location(div17, file$3, 102, 10, 4611);
+    			attr_dev(div18, "class", "flex justify-center items-center m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400");
+    			add_location(div18, file$3, 96, 8, 4139);
     			attr_dev(div19, "class", "text-xs font-normal leading-none max-w-full flex-initial");
-    			add_location(div19, file$3, 110, 10, 5214);
-    			attr_dev(div20, "class", "flex justify-center items-center m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400 ");
-    			add_location(div20, file$3, 104, 8, 4741);
+    			add_location(div19, file$3, 112, 10, 5213);
+    			attr_dev(div20, "class", "flex justify-center items-center m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400");
+    			add_location(div20, file$3, 106, 8, 4741);
     			attr_dev(div21, "class", "text-xs font-normal leading-none max-w-full flex-initial");
-    			add_location(div21, file$3, 120, 10, 5816);
-    			attr_dev(div22, "class", "flex justify-center items-center m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400 ");
-    			add_location(div22, file$3, 114, 8, 5343);
+    			add_location(div21, file$3, 122, 10, 5814);
+    			attr_dev(div22, "class", "flex justify-center items-center m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400");
+    			add_location(div22, file$3, 116, 8, 5342);
     			attr_dev(div23, "class", "text-xs font-normal leading-none max-w-full flex-initial");
-    			add_location(div23, file$3, 130, 10, 6414);
-    			attr_dev(div24, "class", "flex justify-center items-center m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400 ");
-    			add_location(div24, file$3, 124, 8, 5941);
-    			attr_dev(div25, "class", "mt-6 grid grid-cols-4 gap-2 h-0 text-center ");
-    			add_location(div25, file$3, 48, 6, 1639);
+    			add_location(div23, file$3, 132, 10, 6411);
+    			attr_dev(div24, "class", "flex justify-center items-center m-1 font-medium lg:py-1 py-2 px-2 bg-white rounded-full text-gray-700 bg-gray-150 border border-red-400");
+    			add_location(div24, file$3, 126, 8, 5939);
+    			attr_dev(div25, "class", "mt-6 grid grid-cols-4 gap-2 h-0 text-center");
+    			add_location(div25, file$3, 50, 6, 1646);
     			attr_dev(div26, "class", "lg:flex rounded-lg lg:px-32 lg:-my-48 my-72 lg:ml-40 justify-center");
-    			add_location(div26, file$3, 34, 4, 1047);
+    			add_location(div26, file$3, 34, 4, 1043);
     			attr_dev(div27, "class", "bg-white lg:h-screen h-full font-mono");
     			add_location(div27, file$3, 5, 2, 62);
     			add_location(main, file$3, 4, 0, 53);
