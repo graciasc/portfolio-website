@@ -3,13 +3,38 @@
 @theme {
   --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif,
     "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --color-main: #ffffff;
+  --color-secondary-hue: #ffffff;
+  --color-grey: #e5e7eb;
+  --color-h-hue: #111827;
+  --color-p-hue: #4b5563;
+  --color-gray-150: #f3f4f6;
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@utility animate-fade-in {
+  animation: fade-in 2s ease-in;
 }
 
 html,
 body {
-  @apply bg-white dark:bg-gray-950;
+  @apply bg-white text-gray-900;
+  position: relative;
+  width: 100%;
+  min-height: 100%;
+  margin: 0;
+}
 
-  @media (prefers-color-scheme: dark) {
-    color-scheme: dark;
-  }
+.a-no-style {
+  text-decoration: inherit;
+  color: inherit;
+  cursor: pointer;
 }
