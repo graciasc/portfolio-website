@@ -15,7 +15,7 @@ export function Nav() {
   return (
     <main>
       <div className="flex-1 font-mono">
-        <div className={`lg:px-6 py-2 my-2 px-4 border-b-2 ${border} flex justify-between`}>
+        <div className={`lg:px-6 py-2 my-2 px-4 border-b-2 ${border} flex items-center justify-between`}>
           <div>
             <h1 className="text-black hover:text-red-500" onClick={() => close()}>
               <Link className="a-no-style" to="/">
@@ -35,28 +35,44 @@ export function Nav() {
             </button>
           </div>
 
-          <div className="lg:block lg:float-right hidden cursor-pointer">
-            <p className={`px-2 inline border-transparent border-b-2 hover:border-red-400 ${active === "about" ? "border-red-400" : ""}`}>
-              <Link className="a-no-style" onClick={() => close("about")} to="/about">
-                About
-              </Link>
-            </p>
-            <p className="px-2 inline border-transparent border-b-2 hover:border-red-400">
-              <a target="_blank" rel="noreferrer" className="a-no-style" href="/images/graciasc.pdf" download>
-                Resume
+          <nav className="hidden cursor-pointer items-center gap-4 lg:flex">
+            <Link
+              className={`a-no-style border-b-2 border-transparent leading-none hover:border-red-400 ${active === "about" ? "border-red-400" : ""}`}
+              onClick={() => close("about")}
+              to="/about"
+            >
+              About
+            </Link>
+            <a
+              target="_blank"
+              rel="noreferrer"
+              className="a-no-style border-b-2 border-transparent leading-none hover:border-red-400"
+              href="/images/graciasc.pdf"
+              download
+            >
+              Resume
+            </a>
+            <div className="ml-1 flex items-center gap-2">
+              <a
+                target="_blank"
+                rel="noreferrer"
+                className="a-no-style flex h-9 w-9 items-center justify-center"
+                href="https://github.com/graciasc"
+                aria-label="GitHub"
+              >
+                <i className="fa fa-github fa-2x text-black hover:text-gray-700" aria-hidden="true" />
               </a>
-            </p>
-            <p className="px-1 border-transparent inline border-b-2 bottom-1 relative hover:border-teal-600 focus:outline-none outline-none">
-              <a target="_blank" rel="noreferrer" className="a-no-style" href="https://github.com/graciasc" aria-label="GitHub">
-                <i className="fa fa-github fa-2x text-black hover:text-gray-700 bg-white" />
+              <a
+                target="_blank"
+                rel="noreferrer"
+                className="a-no-style flex h-9 w-9 items-center justify-center"
+                href="https://www.linkedin.com/in/gracias-claude/"
+                aria-label="LinkedIn"
+              >
+                <i className="fa fa-linkedin-square fa-2x text-blue-600 hover:text-blue-800" aria-hidden="true" />
               </a>
-            </p>
-            <p className="px-1 border-transparent inline border-b-2 bottom-1 relative hover:border-teal-600 focus:outline-none outline-none">
-              <a target="_blank" rel="noreferrer" className="a-no-style" href="https://www.linkedin.com/in/gracias-claude/" aria-label="LinkedIn">
-                <i className="fa fa-linkedin-square fa-2x text-blue-600 hover:text-blue-800 bg-white" />
-              </a>
-            </p>
-          </div>
+            </div>
+          </nav>
         </div>
       </div>
 
