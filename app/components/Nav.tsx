@@ -15,9 +15,14 @@ export function Nav() {
   return (
     <main>
       <div className="flex-1 font-mono">
-        <div className={`lg:px-6 py-2 my-2 px-4 border-b-2 ${border} flex items-center justify-between`}>
+        <div
+          className={`lg:px-6 py-2 my-2 px-4 border-b-2 ${border} flex items-center justify-between`}
+        >
           <div>
-            <h1 className="text-black hover:text-red-500" onClick={() => close()}>
+            <h1
+              className="text-black hover:text-red-500"
+              onClick={() => close()}
+            >
               <Link className="a-no-style" to="/">
                 Gracias
               </Link>
@@ -31,7 +36,9 @@ export function Nav() {
               aria-label="Toggle menu"
               onClick={() => setOpen((value) => !value)}
             >
-              <i className={`fa ${open ? "fa-times float-right" : "fa-bars"} fa-lg cursor-pointer`} />
+              <i
+                className={`fa ${open ? "fa-times float-right" : "fa-bars"} fa-lg cursor-pointer`}
+              />
             </button>
           </div>
 
@@ -60,7 +67,10 @@ export function Nav() {
                 href="https://github.com/graciasc"
                 aria-label="GitHub"
               >
-                <i className="fa fa-github fa-2x text-black hover:text-gray-700" aria-hidden="true" />
+                <i
+                  className="fa fa-github fa-2x text-black hover:text-gray-700"
+                  aria-hidden="true"
+                />
               </a>
               <a
                 target="_blank"
@@ -69,7 +79,10 @@ export function Nav() {
                 href="https://www.linkedin.com/in/gracias-claude/"
                 aria-label="LinkedIn"
               >
-                <i className="fa fa-linkedin-square fa-2x text-blue-600 hover:text-blue-800" aria-hidden="true" />
+                <i
+                  className="fa fa-linkedin-square fa-2x text-blue-600 hover:text-blue-800"
+                  aria-hidden="true"
+                />
               </a>
             </div>
           </nav>
@@ -80,13 +93,28 @@ export function Nav() {
         <div className="px-3 font-mono grid">
           <nav className="cursor-pointer block">
             <ul>
-              <li className={`table border-transparent border-b-2 hover:border-red-400 ${active === "about" ? "border-red-400" : ""}`}>
-                <Link onClick={() => close("about")} className="a-no-style" to="/about">
+              <li
+                className={`table border-transparent border-b-2 hover:border-red-400 ${active === "about" ? "border-red-400" : ""}`}
+              >
+                <Link
+                  onClick={() => close("about")}
+                  className="a-no-style"
+                  to="/about"
+                >
                   About
                 </Link>
               </li>
-              <li className={`table border-transparent border-b-2 hover:border-red-400 ${active === "resume" ? "border-red-400" : ""}`}>
-                <a onClick={() => close("resume")} target="_blank" rel="noreferrer" className="a-no-style" href="/images/graciasc.pdf" download>
+              <li
+                className={`table border-transparent border-b-2 hover:border-red-400 ${active === "resume" ? "border-red-400" : ""}`}
+              >
+                <a
+                  onClick={() => close("resume")}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="a-no-style"
+                  href="/images/graciasc.pdf"
+                  download
+                >
                   Resume
                 </a>
               </li>
