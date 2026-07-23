@@ -1,33 +1,31 @@
 {
-  "name": "svelte-app",
-  "version": "1.0.0",
+  "name": "gracias-web",
   "private": true,
+  "type": "module",
   "scripts": {
-    "build": "rollup -c ",
-    "dev": "rollup -c -w",
-    "start": "sirv public --single --host --port 3000"
-  },
-  "devDependencies": {
-    "@rollup/plugin-commonjs": "^17.0.0",
-    "@rollup/plugin-node-resolve": "^11.0.0",
-    "rollup": "^2.3.4",
-    "rollup-plugin-css-only": "^3.1.0",
-    "rollup-plugin-livereload": "^2.0.0",
-    "rollup-plugin-svelte": "^7.0.0",
-    "rollup-plugin-terser": "^7.0.0",
-    "svelte": "^3.0.0"
+    "build": "react-router build",
+    "dev": "react-router dev",
+    "start": "react-router-serve ./build/server/index.js",
+    "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
-    "@fortawesome/free-solid-svg-icons": "^5.15.3",
-    "@tailwindcss/aspect-ratio": "^0.2.1",
-    "animejs": "^3.2.1",
-    "autoprefixer": "^9",
-    "glob-parent": "^5.1.2",
-    "postcss": "7.0.35",
-    "sirv-cli": "^1.0.0",
-    "svelte-awesome": "^2.3.2",
-    "svelte-preprocess": "^4.7.3",
-    "svelte-router-spa": "^6.0.2",
-    "tailwindcss": "npm:@tailwindcss/postcss7-compat"
+    "@react-router/fs-routes": "^7.6.0",
+    "@react-router/node": "^7.5.3",
+    "@react-router/serve": "^7.5.3",
+    "isbot": "^5.1.27",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0",
+    "react-router": "^7.5.3"
+  },
+  "devDependencies": {
+    "@react-router/dev": "^7.5.3",
+    "@tailwindcss/vite": "^4.1.4",
+    "@types/node": "^20",
+    "@types/react": "^19.1.2",
+    "@types/react-dom": "^19.1.2",
+    "tailwindcss": "^4.1.4",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.3",
+    "vite-tsconfig-paths": "^5.1.4"
   }
 }
